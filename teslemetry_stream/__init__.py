@@ -69,15 +69,18 @@ class TeslemetryStream:
 
     async def connect(self) -> None:
         """Connect to the telemetry stream."""
-        try:
-            self._response = await self._session.post(
-                f"{SERVER}/{self.vin}",
-                headers=self._headers,
-                raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(connect=5, sock_read=30, total=None),
-            )
-        except aiohttp.ClientConnectionError as error:
-            raise error
+
+        self._response = await self._session.post(
+            f"{SERVER}/{self.vin}",
+            headers=self._headers,
+            raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(connect=5, sock_read=30, total=None),
+        )
+
+    async def listen(self, callback):
+        """Listen to the telemetry stream."""
+        async for event in self:
+            callback(event)
 
     async def close(self) -> None:
         """Close connection."""
@@ -101,7 +104,7 @@ class TeslemetryStream:
     async def __anext__(self) -> dict:
         """Return next event."""
         if not self._response:
-            raise ValueError
+            await self.connect()
 
         try:
             async for line_in_bytes in self._response.content:
