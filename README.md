@@ -1,5 +1,5 @@
 # Teslemetry Stream Library
-This is an asynchronous python library that connects to the Teslemetry Stream server and provides Tesla Fleet Telemetry over server side events.
+This is an asynchronous Python 3 library that connects to the Teslemetry Stream server and provides Tesla Fleet Telemetry using server side events.
 
 ## Installation
 
