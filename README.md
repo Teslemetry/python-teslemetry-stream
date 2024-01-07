@@ -10,7 +10,7 @@ This is an asynchronous Python 3 library that connects to the Teslemetry Stream 
 The TeslemetryStream class requires:
 
 - session: an aiohttp.ClientSession
-- access_token: an access token from the (Teslemetry console)[https://teslemetry.com/console]
+- access_token: an access token from the [Teslemetry console](https://teslemetry.com/console)
 - vin: your Tesla's Vehicle Identification Number
 
 The TeslemetryStream instance can then be configured with:
