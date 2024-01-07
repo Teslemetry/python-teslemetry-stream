@@ -11,11 +11,10 @@ async def main():
         await stream.connect()
         print("Connected")
 
-        async def listen(stream):
-            async for event in stream:
-                print(event)
+        async def callback(event):
+            print(event)
 
-        asyncio.create_task(listen(stream))
+        asyncio.create_task(self.listen(callback))
 
         await asyncio.sleep(20)
         await stream.close()

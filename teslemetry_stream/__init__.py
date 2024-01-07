@@ -14,10 +14,10 @@ class TeslemetryStream:
     _update_lock: bool = False
     _response: aiohttp.ClientResponse | None = None
 
-    def __init__(self, session: aiohttp.ClientSession, vin: str, token: str):
+    def __init__(self, session: aiohttp.ClientSession, vin: str, access_token: str):
         self._session = session
         self.vin = vin
-        self._headers = {"Authorization": f"Bearer {token}"}
+        self._headers = {"Authorization": f"Bearer {access_token}"}
 
     async def add_field(
         self, field: TelemetryFields, interval: int, update: bool = True
