@@ -1,4 +1,12 @@
-from enum import StrEnum
+from enum import Enum
+
+
+class IntEnum(int, Enum):
+    """Integer Enum"""
+
+
+class StrEnum(str, Enum):
+    """String Enum"""
 
 
 class TelemetryFields(StrEnum):

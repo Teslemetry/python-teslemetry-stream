@@ -1,9 +1,11 @@
 import aiohttp
 import asyncio
 import json
+import logging
 from .const import TelemetryFields, TelemetryAlerts
 
-SERVER = "http://192.168.1.3:4443"
+LOGGER = logging.getLogger(__package__)
+SERVER = "us-west.teslemetry.com"
 
 
 class TeslemetryStream:
@@ -11,12 +13,19 @@ class TeslemetryStream:
 
     fields: dict[TelemetryFields, dict[str, int]]
     alerts: list[TelemetryAlerts]
-    _update_lock: bool = False
+    _update_lock = asyncio.Lock()
     _response: aiohttp.ClientResponse | None = None
 
-    def __init__(self, session: aiohttp.ClientSession, vin: str, access_token: str):
-        self._session = session
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        access_token: str,
+        server: str = SERVER,
+        vin: str | None = None,
+    ):
         self.vin = vin
+        self.server = server
+        self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}"}
 
     async def add_field(
@@ -56,31 +65,34 @@ class TeslemetryStream:
 
     async def update(self, wait: int = 1) -> None:
         """Update the telemetry stream."""
-        if self._update_lock:
+        if self._update_lock.locked():
             return
-        self._update_lock = True
-        await asyncio.sleep(wait)
-        await self._session.patch(
-            f"{SERVER}/{self.vin}",
-            headers=self._headers,
-            json=self.config,
-        )
-        self._update_lock = False
+        with self._update_lock:
+            await asyncio.sleep(wait)
+            await self._session.post(
+                f"https://api.teslemetry.com/api/telemetry/{self.vin}",
+                headers=self._headers,
+                json=self.config,
+            )
 
     async def connect(self) -> None:
         """Connect to the telemetry stream."""
 
-        self._response = await self._session.post(
-            f"{SERVER}/{self.vin}",
+        LOGGER.debug("Connecting to %s", self.server)
+        self._response = await self._session.get(
+            f"https://{self.server}/sse/{self.vin or ''}",
             headers=self._headers,
             raise_for_status=True,
             timeout=aiohttp.ClientTimeout(connect=5, sock_read=30, total=None),
+        )
+        LOGGER.debug(
+            "Connected to %s with status %s", self._response.url, self._response.status
         )
 
     async def listen(self, callback):
         """Listen to the telemetry stream."""
         async for event in self:
-            callback(event)
+            await callback(event)
 
     async def close(self) -> None:
         """Close connection."""
@@ -105,11 +117,10 @@ class TeslemetryStream:
         """Return next event."""
         if not self._response:
             await self.connect()
-
         try:
             async for line_in_bytes in self._response.content:
                 line = line_in_bytes.decode("utf8")
-                print(line)
+                LOGGER.debug(line)
                 if line.startswith("data:"):
                     return json.loads(line[5:])
                 continue
