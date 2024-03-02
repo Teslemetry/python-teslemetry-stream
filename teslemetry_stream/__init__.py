@@ -190,7 +190,7 @@ class TeslemetryStream:
                             datetime.strptime(main, "%Y-%m-%dT%H:%M:%S").timestamp()
                         ) * 1000 + int(ns[:3])
                     LOGGER.debug("event %s", json.dumps(data))
-                    return json.loads(line[5:])
+                    return data
                 continue
         except aiohttp.ClientConnectionError as error:
             raise StopAsyncIteration from error
