@@ -1,8 +1,9 @@
-from collections.abc import Callable, Awaitable
+from collections.abc import Callable
 import aiohttp
 import asyncio
 import json
 import logging
+from datetime import datetime
 from .const import TelemetryFields, TelemetryAlerts
 
 
@@ -45,6 +46,7 @@ class TeslemetryStream:
         access_token: str,
         server: str | None = None,
         vin: str | None = None,
+        parse_timestamp: bool = False,
     ):
         if not server and not vin:
             raise ValueError("Either server or VIN is required")
@@ -56,12 +58,19 @@ class TeslemetryStream:
         self.server = server
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}"}
+        self.parse_timestamp = parse_timestamp
 
-    async def get_config(self) -> None:
+    async def get_config(self, vin: str | None = None) -> None:
         """Get the current stream config."""
 
+        vin = vin or self.vin
+
+        if not vin:
+            raise ValueError("VIN is required")
+
+        LOGGER.debug("Getting fleet telemetry config from %s", vin)
         req = await self._session.get(
-            f"https://api.teslemetry.com/api/1/vehicles/{self.vin}/fleet_telemetry_config",
+            f"https://api.teslemetry.com/api/1/vehicles/{vin}/fleet_telemetry_config",
             headers=self._headers,
             raise_for_status=True,
         )
@@ -133,7 +142,6 @@ class TeslemetryStream:
     async def connect(self) -> None:
         """Connect to the telemetry stream."""
         if not self.server:
-            LOGGER.debug("No server, getting config")
             await self.get_config()
 
         LOGGER.debug("Connecting to %s", self.server)
@@ -150,6 +158,7 @@ class TeslemetryStream:
     def close(self) -> None:
         """Close connection."""
         if self._response is not None:
+            LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
 
@@ -174,7 +183,13 @@ class TeslemetryStream:
             async for line_in_bytes in self._response.content:
                 line = line_in_bytes.decode("utf8")
                 if line.startswith("data:"):
-                    LOGGER.debug("Received: %s", line[5:])
+                    data = json.loads(line[5:])
+                    if self.parse_timestamp:
+                        main, _, ns = data["createdAt"].partition(".")
+                        data["timestamp"] = int(
+                            datetime.strptime(main, "%Y-%m-%dT%H:%M:%S").timestamp()
+                        ) * 1000 + int(ns[:3])
+                    LOGGER.debug("event %s", json.dumps(data))
                     return json.loads(line[5:])
                 continue
         except aiohttp.ClientConnectionError as error:
