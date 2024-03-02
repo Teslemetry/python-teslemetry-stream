@@ -1,8 +1,10 @@
+from collections.abc import Callable, Awaitable
 import aiohttp
 import asyncio
 import json
 import logging
 from .const import TelemetryFields, TelemetryAlerts
+
 
 LOGGER = logging.getLogger(__package__)
 
@@ -35,6 +37,7 @@ class TeslemetryStream:
     alerts: list[TelemetryAlerts]
     _update_lock = asyncio.Lock()
     _response: aiohttp.ClientResponse | None = None
+    _listeners: dict[Callable, Callable] = {}
 
     def __init__(
         self,
@@ -144,12 +147,7 @@ class TeslemetryStream:
             "Connected to %s with status %s", self._response.url, self._response.status
         )
 
-    async def listen(self, callback):
-        """Listen to the telemetry stream."""
-        async for event in self:
-            await callback(event)
-
-    async def close(self) -> None:
+    def close(self) -> None:
         """Close connection."""
         if self._response is not None:
             self._response.close()
@@ -162,7 +160,7 @@ class TeslemetryStream:
 
     async def __aexit__(self, *exc):
         """Close connection."""
-        await self.close()
+        self.close()
 
     def __aiter__(self):
         """Return"""
@@ -181,3 +179,28 @@ class TeslemetryStream:
                 continue
         except aiohttp.ClientConnectionError as error:
             raise StopAsyncIteration from error
+
+    def async_add_listener(self, callback: Callable) -> Callable[[], None]:
+        """Listen for data updates."""
+        schedule_refresh = not self._listeners
+
+        def remove_listener() -> None:
+            """Remove update listener."""
+            self._listeners.pop(remove_listener)
+            if not self._listeners:
+                self.close()
+
+        self._listeners[remove_listener] = callback
+
+        # This is the first listener, set up task.
+        if schedule_refresh:
+            asyncio.create_task(self.listen())
+
+        return remove_listener
+
+    async def listen(self):
+        """Listen to the telemetry stream."""
+        async for event in self:
+            if event:
+                for listener in self._listeners.values():
+                    listener(event)
