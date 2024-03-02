@@ -5,7 +5,27 @@ import logging
 from .const import TelemetryFields, TelemetryAlerts
 
 LOGGER = logging.getLogger(__package__)
-SERVER = "us-west.teslemetry.com"
+
+
+class TeslemetryStreamError(Exception):
+    """Teslemetry Stream Error"""
+
+    message = "An error occurred with the Teslemetry Stream."
+
+    def __init__(self) -> None:
+        super().__init__(self.message)
+
+
+class TeslemetryStreamConnectionError(TeslemetryStreamError):
+    """Teslemetry Stream Connection Error"""
+
+    message = "An error occurred with the Teslemetry Stream connection."
+
+
+class TeslemetryStreamVehicleNotConfigured(TeslemetryStreamError):
+    """Teslemetry Stream Not Active Error"""
+
+    message = "This vehicle is not configured to connect to Teslemetry."
 
 
 class TeslemetryStream:
@@ -20,13 +40,41 @@ class TeslemetryStream:
         self,
         session: aiohttp.ClientSession,
         access_token: str,
-        server: str = SERVER,
+        server: str | None = None,
         vin: str | None = None,
     ):
+        if not server and not vin:
+            raise ValueError("Either server or VIN is required")
+
+        if server and not server.endswith(".teslemetry.com"):
+            raise ValueError("Server must be a teslemetry.com domain")
+
         self.vin = vin
         self.server = server
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}"}
+
+    async def get_config(self) -> None:
+        """Get the current stream config."""
+
+        req = await self._session.get(
+            f"https://api.teslemetry.com/api/1/vehicles/{self.vin}/fleet_telemetry_config",
+            headers=self._headers,
+            raise_for_status=True,
+        )
+        response = (await req.json()).get("response")
+
+        if (
+            response and (config := response.get("config"))
+            # and config["hostname"].endswith(".teslemetry.com")
+        ):
+            self.server = config["hostname"]
+            self.fields = config["fields"]
+            self.alerts = config["alert_types"]
+        else:
+            raise TeslemetryStreamVehicleNotConfigured()
+        if not response.get("synced"):
+            LOGGER.warning("Vehicle configuration not active")
 
     async def add_field(
         self, field: TelemetryFields, interval: int, update: bool = True
@@ -61,7 +109,11 @@ class TeslemetryStream:
     @property
     def config(self) -> dict:
         """Return current configuration."""
-        return {"fields": self.fields, "alerts": self.alerts}
+        return {
+            "hostname": self.server,
+            "fields": self.fields,
+            "alerts": self.alerts,
+        }
 
     async def update(self, wait: int = 1) -> None:
         """Update the telemetry stream."""
@@ -77,6 +129,9 @@ class TeslemetryStream:
 
     async def connect(self) -> None:
         """Connect to the telemetry stream."""
+        if not self.server:
+            LOGGER.debug("No server, getting config")
+            await self.get_config()
 
         LOGGER.debug("Connecting to %s", self.server)
         self._response = await self._session.get(
@@ -120,8 +175,8 @@ class TeslemetryStream:
         try:
             async for line_in_bytes in self._response.content:
                 line = line_in_bytes.decode("utf8")
-                LOGGER.debug(line)
                 if line.startswith("data:"):
+                    LOGGER.debug("Received: %s", line[5:])
                     return json.loads(line[5:])
                 continue
         except aiohttp.ClientConnectionError as error:
