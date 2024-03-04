@@ -39,6 +39,8 @@ class TeslemetryStream:
     _update_lock = asyncio.Lock()
     _response: aiohttp.ClientResponse | None = None
     _listeners: dict[Callable, Callable] = {}
+    connected = False
+    active = False
 
     def __init__(
         self,
@@ -151,6 +153,7 @@ class TeslemetryStream:
             raise_for_status=True,
             timeout=aiohttp.ClientTimeout(connect=5, sock_read=30, total=None),
         )
+        self.connected = True
         LOGGER.debug(
             "Connected to %s with status %s", self._response.url, self._response.status
         )
@@ -161,6 +164,7 @@ class TeslemetryStream:
             LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
+            self.connected = False
 
     async def __aenter__(self) -> "TeslemetryStream":
         """Connect and listen Server-Sent Event."""
@@ -177,6 +181,7 @@ class TeslemetryStream:
 
     async def __anext__(self) -> dict:
         """Return next event."""
+        self.active = True
         if not self._response:
             await self.connect()
         try:
@@ -194,6 +199,8 @@ class TeslemetryStream:
                 continue
         except aiohttp.ClientConnectionError as error:
             raise StopAsyncIteration from error
+        finally:
+            self.active = False
 
     def async_add_listener(self, callback: Callable) -> Callable[[], None]:
         """Listen for data updates."""
