@@ -3,7 +3,7 @@ import aiohttp
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from .const import TelemetryFields, TelemetryAlerts
 
 
@@ -192,7 +192,9 @@ class TeslemetryStream:
                     if self.parse_timestamp:
                         main, _, ns = data["createdAt"].partition(".")
                         data["timestamp"] = int(
-                            datetime.strptime(main, "%Y-%m-%dT%H:%M:%S").timestamp()
+                            datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
+                            .replace(tzinfo=timezone.utc)
+                            .timestamp()
                         ) * 1000 + int(ns[:3])
                     LOGGER.debug("event %s", json.dumps(data))
                     return data
