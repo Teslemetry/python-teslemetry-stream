@@ -8,6 +8,7 @@ from .const import TelemetryFields, TelemetryAlerts
 
 
 LOGGER = logging.getLogger(__package__)
+DELAY = 10
 
 
 class TeslemetryStreamError(Exception):
@@ -36,11 +37,10 @@ class TeslemetryStream:
 
     fields: dict[TelemetryFields, dict[str, int]]
     alerts: list[TelemetryAlerts]
-    _update_lock = asyncio.Lock()
     _response: aiohttp.ClientResponse | None = None
     _listeners: dict[Callable, Callable] = {}
-    connected = False
-    active = False
+    delay = DELAY
+    active = None
 
     def __init__(
         self,
@@ -62,6 +62,11 @@ class TeslemetryStream:
         self._headers = {"Authorization": f"Bearer {access_token}"}
         self.parse_timestamp = parse_timestamp
 
+    @property
+    def connected(self) -> bool:
+        """Return if connected."""
+        return self._response is not None
+
     async def get_config(self, vin: str | None = None) -> None:
         """Get the current stream config."""
 
@@ -79,8 +84,9 @@ class TeslemetryStream:
         response = (await req.json()).get("response")
 
         if (
-            response and (config := response.get("config"))
-            # and config["hostname"].endswith(".teslemetry.com")
+            response
+            and (config := response.get("config"))
+            and config["hostname"].endswith(".teslemetry.com")
         ):
             self.server = config["hostname"]
             self.fields = config["fields"]
@@ -89,36 +95,6 @@ class TeslemetryStream:
             raise TeslemetryStreamVehicleNotConfigured()
         if not response.get("synced"):
             LOGGER.warning("Vehicle configuration not active")
-
-    async def add_field(
-        self, field: TelemetryFields, interval: int, update: bool = True
-    ) -> None:
-        """Add field to telemetry stream."""
-        if not self.fields.get(field, {}).get("interval_seconds") == interval:
-            self.fields[field] = {"interval_seconds": interval}
-            if update:
-                await self.update()
-
-    async def remove_field(self, field: TelemetryFields, update: bool = True) -> None:
-        """Remove field from telemetry stream."""
-        if field in self.fields:
-            del self.fields[field]
-            if update:
-                await self.update()
-
-    async def add_alert(self, alert: TelemetryAlerts, update: bool = True) -> None:
-        """Add alert to telemetry stream."""
-        if alert not in self.alerts:
-            self.alerts.append(alert)
-            if update:
-                await self.update()
-
-    async def remove_alert(self, alert: TelemetryAlerts, update: bool = True) -> None:
-        """Remove alert from telemetry stream."""
-        if alert in self.alerts:
-            self.alerts.remove(alert)
-            if update:
-                await self.update()
 
     @property
     def config(self) -> dict:
@@ -129,20 +105,9 @@ class TeslemetryStream:
             "alerts": self.alerts,
         }
 
-    async def update(self, wait: int = 1) -> None:
-        """Update the telemetry stream."""
-        if self._update_lock.locked():
-            return
-        with self._update_lock:
-            await asyncio.sleep(wait)
-            await self._session.post(
-                f"https://api.teslemetry.com/api/telemetry/{self.vin}",
-                headers=self._headers,
-                json=self.config,
-            )
-
     async def connect(self) -> None:
         """Connect to the telemetry stream."""
+        self.active = True
         if not self.server:
             await self.get_config()
 
@@ -151,9 +116,10 @@ class TeslemetryStream:
             f"https://{self.server}/sse/{self.vin or ''}",
             headers=self._headers,
             raise_for_status=True,
-            timeout=aiohttp.ClientTimeout(connect=5, sock_read=30, total=None),
+            timeout=aiohttp.ClientTimeout(
+                connect=5, sock_connect=5, sock_read=30, total=None
+            ),
         )
-        self.connected = True
         LOGGER.debug(
             "Connected to %s with status %s", self._response.url, self._response.status
         )
@@ -164,16 +130,6 @@ class TeslemetryStream:
             LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
-            self.connected = False
-
-    async def __aenter__(self) -> "TeslemetryStream":
-        """Connect and listen Server-Sent Event."""
-        await self.connect()
-        return self
-
-    async def __aexit__(self, *exc):
-        """Close connection."""
-        self.close()
 
     def __aiter__(self):
         """Return"""
@@ -181,10 +137,14 @@ class TeslemetryStream:
 
     async def __anext__(self) -> dict:
         """Return next event."""
-        self.active = True
-        if not self._response:
-            await self.connect()
         try:
+            if self.active is False:
+                # Stop the stream and loop
+                self.close()
+                raise StopAsyncIteration
+            if not self._response:
+                # Connect to the stream
+                await self.connect()
             async for line_in_bytes in self._response.content:
                 line = line_in_bytes.decode("utf8")
                 if line.startswith("data:"):
@@ -197,12 +157,14 @@ class TeslemetryStream:
                             .timestamp()
                         ) * 1000 + int(ns[:3])
                     LOGGER.debug("event %s", json.dumps(data))
+                    self.delay = DELAY
                     return data
-                continue
-        except aiohttp.ClientConnectionError as error:
-            raise StopAsyncIteration from error
-        finally:
-            self.active = False
+        except aiohttp.ClientError as error:
+            LOGGER.warning("Connection error: %s", error)
+            self.close()
+            LOGGER.debug("Reconnecting in %s seconds", self.delay)
+            await asyncio.sleep(self.delay)
+            self.delay += DELAY
 
     def async_add_listener(self, callback: Callable) -> Callable[[], None]:
         """Listen for data updates."""
@@ -212,7 +174,7 @@ class TeslemetryStream:
             """Remove update listener."""
             self._listeners.pop(remove_listener)
             if not self._listeners:
-                self.close()
+                self.active = False
 
         self._listeners[remove_listener] = callback
 
@@ -224,7 +186,9 @@ class TeslemetryStream:
 
     async def listen(self):
         """Listen to the telemetry stream."""
+
         async for event in self:
             if event:
                 for listener in self._listeners.values():
                     listener(event)
+            LOGGER.debug("Ending Loop")
