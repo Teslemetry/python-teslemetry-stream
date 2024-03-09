@@ -191,4 +191,4 @@ class TeslemetryStream:
             if event:
                 for listener in self._listeners.values():
                     listener(event)
-            LOGGER.debug("Ending Loop")
+        LOGGER.debug("Listen has finished")
