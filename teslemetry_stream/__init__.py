@@ -146,9 +146,8 @@ class TeslemetryStream:
                 # Connect to the stream
                 await self.connect()
             async for line_in_bytes in self._response.content:
-                line = line_in_bytes.decode("utf8")
-                if line.startswith("data:"):
-                    data = json.loads(line[5:])
+                if raw := line_in_bytes.decode("utf8").partition(": ")[2]:
+                    data = json.loads(raw)
                     if self.parse_timestamp:
                         main, _, ns = data["createdAt"].partition(".")
                         data["timestamp"] = int(
@@ -166,7 +165,9 @@ class TeslemetryStream:
             await asyncio.sleep(self.delay)
             self.delay += DELAY
 
-    def async_add_listener(self, callback: Callable) -> Callable[[], None]:
+    def async_add_listener(
+        self, callback: Callable, filters: dict | None = None
+    ) -> Callable[[], None]:
         """Listen for data updates."""
         schedule_refresh = not self._listeners
 
@@ -176,7 +177,7 @@ class TeslemetryStream:
             if not self._listeners:
                 self.active = False
 
-        self._listeners[remove_listener] = callback
+        self._listeners[remove_listener] = (callback, filters)
 
         # This is the first listener, set up task.
         if schedule_refresh:
@@ -189,6 +190,22 @@ class TeslemetryStream:
 
         async for event in self:
             if event:
-                for listener in self._listeners.values():
-                    listener(event)
+                for listener, filters in self._listeners.values():
+                    if filters and recursive_match(filters, event):
+                        listener(event)
         LOGGER.debug("Listen has finished")
+
+
+def recursive_match(dict1, dict2):
+    """Recursively match dict1 with dict2."""
+    for key, value in dict1.items():
+        if key not in dict2:
+            return False
+        if isinstance(value, dict):
+            if key in dict2:
+                if not recursive_match(value, dict2[key]):
+                    return False
+        elif value != None:
+            if value != dict2[key]:
+                return False
+    return True
