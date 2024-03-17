@@ -146,8 +146,9 @@ class TeslemetryStream:
                 # Connect to the stream
                 await self.connect()
             async for line_in_bytes in self._response.content:
-                if raw := line_in_bytes.decode("utf8").partition(": ")[2]:
-                    data = json.loads(raw)
+                field, _, value = line_in_bytes.decode("utf8").partition(": ")
+                if field == "data":
+                    data = json.loads(value)
                     if self.parse_timestamp:
                         main, _, ns = data["createdAt"].partition(".")
                         data["timestamp"] = int(
