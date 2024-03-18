@@ -192,27 +192,33 @@ class TeslemetryStream:
         async for event in self:
             if event:
                 for listener, filters in self._listeners.values():
-                    if filters and recursive_match(filters, event):
+                    if recursive_match(filters, event):
                         listener(event)
         LOGGER.debug("Listen has finished")
 
 
 def recursive_match(dict1, dict2):
     """Recursively match dict1 with dict2."""
-    for key, value1 in dict1.items():
-        if key not in dict2:
-            return False
-        value2 = dict2[key]
-        if isinstance(value1, dict):
-            if not recursive_match(value1, value2):
+    if dict1 is not None:
+        for key, value1 in dict1.items():
+            if key not in dict2:
+                # A required key isn't present
                 return False
-        elif isinstance(value1, list):
-            if not all(
-                any(recursive_match(item1, item2) for item2 in value2)
-                for item1 in value1
-            ):
-                return False
-        elif value1 is not None:
-            if value1 != value2:
-                return False
+            value2 = dict2[key]
+            if isinstance(value1, dict):
+                # Check the next level of the dict
+                if not recursive_match(value1, value2):
+                    return False
+            elif isinstance(value1, list):
+                # Check each dict in the list
+                if not all(
+                    any(recursive_match(item1, item2) for item2 in value2)
+                    for item1 in value1
+                ):
+                    return False
+            elif value1 is not None:
+                # Check the value matches
+                if value1 != value2:
+                    return False
+    # No differences found
     return True
