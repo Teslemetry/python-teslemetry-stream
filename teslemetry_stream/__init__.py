@@ -199,14 +199,20 @@ class TeslemetryStream:
 
 def recursive_match(dict1, dict2):
     """Recursively match dict1 with dict2."""
-    for key, value in dict1.items():
+    for key, value1 in dict1.items():
         if key not in dict2:
             return False
-        if isinstance(value, dict):
-            if key in dict2:
-                if not recursive_match(value, dict2[key]):
-                    return False
-        elif value != None:
-            if value != dict2[key]:
+        value2 = dict2[key]
+        if isinstance(value1, dict):
+            if not recursive_match(value1, value2):
+                return False
+        elif isinstance(value1, list):
+            if not all(
+                any(recursive_match(item1, item2) for item2 in value2)
+                for item1 in value1
+            ):
+                return False
+        elif value1 is not None:
+            if value1 != value2:
                 return False
     return True
