@@ -102,7 +102,7 @@ class TeslemetryStream:
             f"https://api.teslemetry.com/api/config/{vin or self.vin}",
             headers=self._headers,
             json={"hostname": hostname},
-            raise_for_status=True,
+            raise_for_status=False,
         )
         if resp.ok:
             self.server = hostname
@@ -114,7 +114,7 @@ class TeslemetryStream:
             f"https://api.teslemetry.com/api/config/{vin or self.vin}",
             headers=self._headers,
             json={"fields": fields},
-            raise_for_status=True,
+            raise_for_status=False,
         )
         if resp.ok:
             self.fields = {**self.fields, **fields}
@@ -126,7 +126,7 @@ class TeslemetryStream:
             f"https://api.teslemetry.com/api/config/{vin or self.vin}",
             headers=self._headers,
             json={"fields": fields},
-            raise_for_status=True,
+            raise_for_status=False,
         )
         if resp.ok:
             self.fields = fields
