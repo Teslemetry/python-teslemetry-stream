@@ -96,6 +96,42 @@ class TeslemetryStream:
         if not response.get("synced"):
             LOGGER.warning("Vehicle configuration not active")
 
+    async def change_hostname(self, hostname: str, vin: str | None = None) -> dict:
+        """Update Fleet Telemetry hostname"""
+        resp = await self._session.patch(
+            f"https://api.teslemetry.com/api/config/{vin or self.vin}",
+            headers=self._headers,
+            json={"hostname": hostname},
+            raise_for_status=True,
+        )
+        if resp.ok:
+            self.server = hostname
+        return await resp.json()
+
+    async def update_fields(self, fields: dict, vin: str | None = None) -> dict:
+        """Update Fleet Telemetry configuration"""
+        resp = await self._session.patch(
+            f"https://api.teslemetry.com/api/config/{vin or self.vin}",
+            headers=self._headers,
+            json={"fields": fields},
+            raise_for_status=True,
+        )
+        if resp.ok:
+            self.fields = {**self.fields, **fields}
+        return await resp.json()
+
+    async def replace_fields(self, fields: dict, vin: str | None = None) -> dict:
+        """Replace Fleet Telemetry configuration"""
+        resp = await self._session.post(
+            f"https://api.teslemetry.com/api/config/{vin or self.vin}",
+            headers=self._headers,
+            json={"fields": fields},
+            raise_for_status=True,
+        )
+        if resp.ok:
+            self.fields = fields
+        return await resp.json()
+
     @property
     def config(self) -> dict:
         """Return current configuration."""
