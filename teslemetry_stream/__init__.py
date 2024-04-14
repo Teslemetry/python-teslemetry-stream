@@ -35,8 +35,8 @@ class TeslemetryStreamVehicleNotConfigured(TeslemetryStreamError):
 class TeslemetryStream:
     """Teslemetry Stream Client"""
 
-    fields: dict[TelemetryFields, dict[str, int]]
-    alerts: list[TelemetryAlerts]
+    fields: dict[TelemetryFields, dict[str, int]] | None = None
+    alerts: list[TelemetryAlerts] | None = None
     _response: aiohttp.ClientResponse | None = None
     _listeners: dict[Callable, Callable] = {}
     delay = DELAY
