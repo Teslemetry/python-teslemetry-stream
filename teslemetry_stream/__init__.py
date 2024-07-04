@@ -8,7 +8,7 @@ from .const import TelemetryFields, TelemetryAlerts
 
 
 LOGGER = logging.getLogger(__package__)
-DELAY = 10
+DELAY = 1
 
 
 class TeslemetryStreamError(Exception):
@@ -30,6 +30,12 @@ class TeslemetryStreamVehicleNotConfigured(TeslemetryStreamError):
     """Teslemetry Stream Not Active Error"""
 
     message = "This vehicle is not configured to connect to Teslemetry."
+
+
+class TeslemetryStreamEnded(TeslemetryStreamError):
+    """Teslemetry Stream Connection Error"""
+
+    message = "The stream was ended by the server."
 
 
 class TeslemetryStream:
@@ -192,15 +198,16 @@ class TeslemetryStream:
                             .replace(tzinfo=timezone.utc)
                             .timestamp()
                         ) * 1000 + int(ns[:3])
-                    LOGGER.debug("event %s", json.dumps(data))
+                    # LOGGER.debug("event %s", json.dumps(data))
                     self.delay = DELAY
                     return data
-        except aiohttp.ClientError as error:
+            raise TeslemetryStreamEnded()
+        except (TeslemetryStreamEnded, aiohttp.ClientError) as error:
             LOGGER.warning("Connection error: %s", error)
             self.close()
             LOGGER.debug("Reconnecting in %s seconds", self.delay)
             await asyncio.sleep(self.delay)
-            self.delay += DELAY
+            self.delay += self.delay
 
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
