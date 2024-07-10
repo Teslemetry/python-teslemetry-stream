@@ -44,8 +44,8 @@ class TeslemetryStream:
     fields: dict[TelemetryFields, dict[str, int]] | None = None
     alerts: list[TelemetryAlerts] | None = None
     _response: aiohttp.ClientResponse | None = None
-    _listeners: dict[Callable, Callable] = {}
-    delay = DELAY
+    _listeners: dict[Callable, Callable]
+    delay: int
     active = None
 
     def __init__(
@@ -64,9 +64,11 @@ class TeslemetryStream:
 
         self.vin = vin
         self.server = server
+        self._listeners = {}
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}"}
         self.parse_timestamp = parse_timestamp
+        self.delay = DELAY
 
     @property
     def connected(self) -> bool:
