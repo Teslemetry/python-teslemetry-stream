@@ -66,7 +66,7 @@ class TeslemetryStream:
         self.server = server
         self._listeners = {}
         self._session = session
-        self._headers = {"Authorization": f"Bearer {access_token}"}
+        self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
         self.parse_timestamp = parse_timestamp
         self.delay = DELAY
 
