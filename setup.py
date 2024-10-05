@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="teslemetry_stream",
-    version="0.4.1",
+    version="0.4.2",
     author="Brett Adams",
     author_email="hello@teslemetry.com",
     description="Teslemetry Streaming API library for Python",
@@ -20,5 +20,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",
-    install_requires=["aiohttp", "asyncio"],
+    install_requires=["aiohttp"],
 )
