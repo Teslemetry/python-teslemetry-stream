@@ -14,6 +14,8 @@ The TeslemetryStream class requires:
 - One or both:
   - vin: your Tesla's Vehicle Identification Number
   - server: The Teslemetry server to connect to
+    - na.teslemetry.com
+    - eu.teslemetry.com
 
 The full list of possible values are provided in `TeslemetryStream.Fields` and `TeslemetryStream.Alerts`
 

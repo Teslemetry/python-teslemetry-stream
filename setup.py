@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="teslemetry_stream",
-    version="0.4.2",
+    version="0.4.3",
     author="Brett Adams",
     author_email="hello@teslemetry.com",
     description="Teslemetry Streaming API library for Python",
@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://github.com/Teslemetry/teslemetry_stream",
     packages=setuptools.find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",

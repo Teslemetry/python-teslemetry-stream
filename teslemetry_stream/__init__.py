@@ -43,6 +43,7 @@ class TeslemetryStream:
 
     fields: dict[TelemetryFields, dict[str, int]] | None = None
     alerts: list[TelemetryAlerts] | None = None
+    preferTyped: bool
     _response: aiohttp.ClientResponse | None = None
     _listeners: dict[Callable, Callable]
     delay: int
@@ -99,25 +100,28 @@ class TeslemetryStream:
             self.server = config["hostname"]
             self.fields = config["fields"]
             self.alerts = config["alert_types"]
+            self.preferTyped = config["prefer_typed"]
         else:
             raise TeslemetryStreamVehicleNotConfigured()
         if not response.get("synced"):
             LOGGER.warning("Vehicle configuration not active")
 
-    async def change_hostname(self, hostname: str, vin: str | None = None) -> dict:
-        """Update Fleet Telemetry hostname"""
+    async def prefer_typed(self, prefer_typed: bool = True, vin: str | None = None) -> dict:
+        """Set prefer typed."""
+        assert (vin or self.vin)
         resp = await self._session.patch(
             f"https://api.teslemetry.com/api/config/{vin or self.vin}",
             headers=self._headers,
-            json={"hostname": hostname},
+            json={"prefer_typed": prefer_typed},
             raise_for_status=False,
         )
         if resp.ok:
-            self.server = hostname
+            self.preferTyped = prefer_typed
         return await resp.json()
 
     async def update_fields(self, fields: dict, vin: str | None = None) -> dict:
         """Update Fleet Telemetry configuration"""
+        assert (vin or self.vin)
         resp = await self._session.patch(
             f"https://api.teslemetry.com/api/config/{vin or self.vin}",
             headers=self._headers,
