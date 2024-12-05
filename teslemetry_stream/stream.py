@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from .vehicle import TeslemetryStreamVehicle
-from .exceptions import TeslemetryStreamEnded
+from .exception import TeslemetryStreamEnded
 
 DELAY = 1
 LOGGER = logging.getLogger(__package__)

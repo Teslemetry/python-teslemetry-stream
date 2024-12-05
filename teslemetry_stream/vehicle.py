@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 import asyncio
 import logging
 from .const import TelemetryFields
-from encodings import undefined
 
 if TYPE_CHECKING:
     from .stream import TeslemetryStream
