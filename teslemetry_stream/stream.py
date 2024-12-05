@@ -56,13 +56,16 @@ class TeslemetryStream:
 
     async def get_config(self, vin: str | None = None) -> None:
         """Get the current stream config."""
-        await self.find_server()
+        if not self.server:
+            await self.find_server()
+        if hasattr(self, 'vehicle'):
+            await self.vehicle.get_config()
 
     async def find_server(self) -> None:
         """Find the server using metadata."""
 
         req = await self._session.get(
-            f"https://api.teslemetry.com/api/metadata",
+            "https://api.teslemetry.com/api/metadata",
             headers=self._headers,
             raise_for_status=True,
         )
