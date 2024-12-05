@@ -11,13 +11,12 @@ The TeslemetryStream class requires:
 
 - session: an aiohttp.ClientSession
 - access_token: an access token from the [Teslemetry console](https://teslemetry.com/console)
-- One or both:
-  - vin: your Tesla's Vehicle Identification Number
-  - server: The Teslemetry server to connect to
-    - na.teslemetry.com
-    - eu.teslemetry.com
+- vin: If you only want to use a single vehicle, otherwise use `create_vehicle`
+- server: The Teslemetry server to connect to, otherwise use `find_server`
+  - na.teslemetry.com
+  - eu.teslemetry.com
 
-The full list of possible values are provided in `TeslemetryStream.Fields` and `TeslemetryStream.Alerts`
+The full list of possible values are provided in `TelemetryFields` and `TelemetryAlerts`
 
 To connect, either use `async with` on the instance, call `connect()`, or register an callback with `async_add_listener`, which will connect when added and disconnect when removed.
 
@@ -30,7 +29,8 @@ async def main():
     async with aiohttp.ClientSession() as session:
         stream = TeslemetryStream(
             access_token="<token>",
-            vin="<vin>",
+            vin="<vin>", # for single vehicles
+            server="na.teslemetry.com" # or "eu.teslemetry.com"
             session=session,
         )
         await stream.connect()
