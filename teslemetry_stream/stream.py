@@ -194,7 +194,10 @@ class TeslemetryStream:
             if event:
                 for listener, filters in self._listeners.values():
                     if recursive_match(filters, event):
-                        listener(event)
+                        try:
+                            listener(event)
+                        except Exception as error:
+                            LOGGER.error("Uncaught error in listener: %s", error)
         LOGGER.debug("Listen has finished")
 
 def recursive_match(dict1, dict2):
