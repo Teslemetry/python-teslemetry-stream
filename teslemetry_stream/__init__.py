@@ -6,7 +6,7 @@ from .exception import (
     TeslemetryStreamVehicleNotConfigured,
     TeslemetryStreamEnded
 )
-from .const import TelemetryFields, TelemetryAlerts
+from .const import Signal, Alert
 
 __all__ = [
     "TeslemetryStream",
@@ -15,6 +15,6 @@ __all__ = [
     "TeslemetryStreamConnectionError",
     "TeslemetryStreamVehicleNotConfigured",
     "TeslemetryStreamEnded",
-    "TelemetryFields",
-    "TelemetryAlerts"
+    "Signal",
+    "Alert"
 ]

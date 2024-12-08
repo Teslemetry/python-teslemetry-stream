@@ -9,8 +9,8 @@ class StrEnum(str, Enum):
     """String Enum"""
 
 
-class TelemetryFields(StrEnum):
-    """Fields available in telemetry streams"""
+class Signal(StrEnum):
+    """Signals available in Fleet Telemetry streams"""
 
     AC_CHARGING_ENERGY_IN = "ACChargingEnergyIn"
     AC_CHARGING_POWER = "ACChargingPower"
@@ -213,8 +213,8 @@ class TelemetryFields(StrEnum):
     WIPER_HEAT_ENABLED = "WiperHeatEnabled"
 
 
-class TelemetryAlerts(StrEnum):
-    """Alerts available in telemetry streams"""
+class Alert(StrEnum):
+    """Alerts available in Fleet Telemetry streams"""
 
     CUSTOMER = "Customer"
     SERVICE = "Service"

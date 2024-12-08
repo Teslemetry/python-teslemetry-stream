@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 import asyncio
 import logging
-from .const import TelemetryFields
+from .const import Signal
 
 if TYPE_CHECKING:
     from .stream import TeslemetryStream
@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__package__)
 class TeslemetryStreamVehicle:
     """Handle streaming field updates."""
 
-    fields: dict[TelemetryFields, dict[str, int]] = {}
+    fields: dict[Signal, dict[str, int]] = {}
     preferTyped: bool | None = None
     _config: dict = {}
 
@@ -73,9 +73,9 @@ class TeslemetryStreamVehicle:
                     self.preferTyped = prefer_typed
                 self._config.clear()
 
-    async def add_field(self, field: TelemetryFields | str, interval: int | None = None) -> None:
+    async def add_field(self, field: Signal | str, interval: int | None = None) -> None:
         """Handle vehicle data from the stream."""
-        if isinstance(field, TelemetryFields):
+        if isinstance(field, Signal):
             field = field.value
 
         if field in self.fields and (interval is None or self.fields[field].get("interval_seconds") == interval):

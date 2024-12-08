@@ -18,6 +18,7 @@ class TeslemetryStream:
     delay: int
     active = None
     vehicle: TeslemetryStreamVehicle
+    vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
     def __init__(
         self,
@@ -39,15 +40,15 @@ class TeslemetryStream:
         self.delay = DELAY
 
         if(self.vin):
-            self.vehicle = self.create_vehicle(self.vin)
+            self.vehicle = self.get_vehicle(self.vin)
 
-    def create_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
+    def get_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
         """Create a vehicle stream."""
         if self.vin is not None and self.vin != vin:
             raise AttributeError("Stream started in single vehicle mode")
-        if hasattr(self, 'vehicle'):
-            return self.vehicle
-        return TeslemetryStreamVehicle(self, vin)
+        if vin not in self.vehicles:
+            self.vehicles[vin] = TeslemetryStreamVehicle(self, vin)
+        return self.vehicles[vin]
 
     @property
     def connected(self) -> bool:
