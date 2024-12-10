@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
 import asyncio
 import logging
+
+from attr import dataclass
 from .const import Signal
 
 if TYPE_CHECKING:
@@ -57,13 +59,11 @@ class TeslemetryStreamVehicle:
             if not self._config:
                 return
 
-            resp = await self.stream._session.patch(
-                f"https://api.teslemetry.com/api/config/{self.vin}",
-                headers=self.stream._headers,
-                json=self._config,
-                raise_for_status=False,
-            )
-            if resp.ok:
+            resp = await self.patch_config(config)
+            if error := resp.get("error"):
+                LOGGER.error("Error updating streaming config for %s: %s", self.vin, error)
+                return
+            elif resp.get("response",{}).get("updated_vehicles"):
                 LOGGER.info("Updated vehicle streaming config for %s", self.vin)
                 if fields := self._config.get("fields"):
                     LOGGER.debug("Configured streaming fields %s", ", ".join(fields.keys()))
@@ -72,6 +72,27 @@ class TeslemetryStreamVehicle:
                     LOGGER.debug("Configured streaming typed to %s", prefer_typed)
                     self.preferTyped = prefer_typed
                 self._config.clear()
+
+
+    async def patch_config(self, config: dict) -> dict[str, str|dict]:
+        """Modify the configuration for the vehicle."""
+        resp = await self.stream._session.patch(
+            f"https://api.teslemetry.com/api/config/{self.vin}",
+            headers=self.stream._headers,
+            json=config,
+            raise_for_status=False,
+        )
+        return await resp.json()
+
+    async def post_config(self, config: dict) -> dict[str, str|dict]:
+        """Overwrite the configuration for the vehicle."""
+        resp = await self.stream._session.post(
+            f"https://api.teslemetry.com/api/config/{self.vin}",
+            headers=self.stream._headers,
+            json=config,
+            raise_for_status=False,
+        )
+        return await resp.json()
 
     async def add_field(self, field: Signal | str, interval: int | None = None) -> None:
         """Handle vehicle data from the stream."""
