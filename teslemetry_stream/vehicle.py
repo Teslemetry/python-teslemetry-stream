@@ -51,7 +51,9 @@ class TeslemetryStreamVehicle:
 
         # Lock so that we dont change the config while making the API call
         async with self.lock:
+            print(self._config)
             self._config = merge(config, self._config)
+            print(self._config)
 
         await asyncio.sleep(1)
 
@@ -59,11 +61,11 @@ class TeslemetryStreamVehicle:
             if not self._config:
                 return
 
-            resp = await self.patch_config(config)
-            if error := resp.get("error"):
+            data = await self.patch_config(self._config)
+            if error := data.get("error"):
                 LOGGER.error("Error updating streaming config for %s: %s", self.vin, error)
                 return
-            elif resp.get("response",{}).get("updated_vehicles"):
+            elif data.get("response",{}).get("updated_vehicles"):
                 LOGGER.info("Updated vehicle streaming config for %s", self.vin)
                 if fields := self._config.get("fields"):
                     LOGGER.debug("Configured streaming fields %s", ", ".join(fields.keys()))
