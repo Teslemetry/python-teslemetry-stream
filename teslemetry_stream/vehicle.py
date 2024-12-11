@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 import asyncio
 import logging
 
-from attr import dataclass
 from .const import Signal
 
 if TYPE_CHECKING:
@@ -51,9 +50,7 @@ class TeslemetryStreamVehicle:
 
         # Lock so that we dont change the config while making the API call
         async with self.lock:
-            print(self._config)
             self._config = merge(config, self._config)
-            print(self._config)
 
         await asyncio.sleep(1)
 
