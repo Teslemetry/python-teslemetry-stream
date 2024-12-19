@@ -51,6 +51,7 @@ class Signal(StrEnum):
     DC_CHARGING_ENERGY_IN = "DCChargingEnergyIn"
     DC_CHARGING_POWER = "DCChargingPower"
     DC_DC_ENABLE = "DCDCEnable"
+    DESTINATION_NAME = "DestinationName"
     DEFROST_FOR_PRECONDITIONING = "DefrostForPreconditioning"
     DEFROST_MODE = "DefrostMode"
     DESTINATION_LOCATION = "DestinationLocation"
@@ -211,6 +212,16 @@ class Signal(StrEnum):
     VERSION = "Version"
     WHEEL_TYPE = "WheelType"
     WIPER_HEAT_ENABLED = "WiperHeatEnabled"
+    LOCATED_AT_HOME = "LocatedAtHome"
+    LOCATED_AT_WORK = "LocatedAtWork"
+    LOCATED_AT_FAVORITE = "LocatedAtFavorite"
+    SETTING_DISTANCE_UNIT = "SettingDistanceUnit"
+    SETTING_TEMPERATURE_UNIT = "SettingTemperatureUnit"
+    SETTING_24_HOUR_TIME = "Setting24HourTime"
+    SETTING_TIRE_PRESSURE_UNIT = "SettingTirePressureUnit"
+    SETTING_CHARGE_UNIT = "SettingChargeUnit"
+    CLIMATE_SEAT_COOLING_FRONT_LEFT = "ClimateSeatCoolingFrontLeft"
+    CLIMATE_SEAT_COOLING_FRONT_RIGHT = "ClimateSeatCoolingFrontRight"
 
 
 class Alert(StrEnum):
