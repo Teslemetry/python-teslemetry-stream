@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+
+from teslemetry_stream.const import TeslemetryStreamMessage
 from .vehicle import TeslemetryStreamVehicle
 from .exception import TeslemetryStreamEnded
 
@@ -27,6 +29,7 @@ class TeslemetryStream:
         server: str | None = None,
         vin: str | None = None,
         parse_timestamp: bool = False,
+        typed: bool = False,
     ):
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
@@ -37,6 +40,7 @@ class TeslemetryStream:
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
         self.parse_timestamp = parse_timestamp
+        self.typed = typed
         self.delay = DELAY
 
         if(self.vin):
@@ -196,7 +200,10 @@ class TeslemetryStream:
                 for listener, filters in self._listeners.values():
                     if recursive_match(filters, event):
                         try:
-                            listener(event)
+                            if self.typed:
+                                listener(TeslemetryStreamMessage(**event))
+                            else:
+                                listener(event)
                         except Exception as error:
                             LOGGER.error("Uncaught error in listener: %s", error)
         LOGGER.debug("Listen has finished")

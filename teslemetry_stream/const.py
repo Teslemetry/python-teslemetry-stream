@@ -1,5 +1,21 @@
 from enum import Enum
+from typing_extensions import Optional
+from dataclasses import dataclass, is_dataclass
 
+def nested_dataclass(*args, **kwargs):
+    def wrapper(cls):
+        cls = dataclass(cls, **kwargs)
+        original_init = cls.__init__
+        def __init__(self, *args, **kwargs):
+            for name, value in kwargs.items():
+                field_type = cls.__annotations__.get(name, None)
+                if is_dataclass(field_type) and isinstance(value, dict):
+                     new_obj = field_type(**value)
+                     kwargs[name] = new_obj
+            original_init(self, *args, **kwargs)
+        cls.__init__ = __init__
+        return cls
+    return wrapper(args[0]) if args else wrapper
 
 class IntEnum(int, Enum):
     """Integer Enum"""
@@ -230,3 +246,621 @@ class Alert(StrEnum):
     CUSTOMER = "Customer"
     SERVICE = "Service"
     SERVICE_FIX = "ServiceFix"
+
+
+@dataclass
+class TeslaLocation:
+    """Location data"""
+
+    latitude: float
+    longitude: float
+
+@dataclass
+class TeslaDoors:
+    """Door data"""
+
+    DriverFront: bool
+    PassengerFront: bool
+    DriverRear: bool
+    PassengerRear: bool
+    TrunkFront: bool
+    TrunkRear: bool
+
+@dataclass
+class TeslaStreamData:
+
+    ACChargingEnergyIn: Optional[float] = None
+    ACChargingPower: Optional[float] = None
+    AutoSeatClimateLeft: Optional[bool] = None
+    AutoSeatClimateRight: Optional[bool] = None
+    AutomaticBlindSpotCamera: Optional[bool] = None
+    AutomaticEmergencyBrakingOff: Optional[bool] = None
+    BMSState: Optional[str] = None
+    BatteryHeaterOn: Optional[str] = None #unknown
+    BatteryLevel: Optional[float] = None
+    BlindSpotCollisionWarningChime: Optional[bool] = None
+    BmsFullchargecomplete: Optional[bool] = None
+    BrakePedal: Optional[bool] = None
+    BrakePedalPos: Optional[float] = None
+    BrickVoltageMax: Optional[float] = None
+    BrickVoltageMin: Optional[float] = None
+    CabinOverheatProtectionMode: Optional[str] = None
+    CabinOverheatProtectionTemperatureLimit: Optional[str] = None
+    CarType: Optional[str] = None
+    CenterDisplay: Optional[str] = None
+    ChargeAmps: Optional[float] = None
+    ChargeCurrentRequest: Optional[int] = None
+    ChargeCurrentRequestMax: Optional[int] = None
+    ChargeEnableRequest: Optional[bool] = None
+    ChargeLimitSoc: Optional[int] = None
+    ChargePort: Optional[str] = None
+    ChargePortColdWeatherMode: Optional[bool] = None
+    ChargePortDoorOpen: Optional[bool] = None
+    ChargePortLatch: Optional[str] = None
+    ChargeState: Optional[str] = None
+    ChargerPhases: Optional[int] = None
+    ChargingCableType: Optional[str] = None
+    ClimateKeeperMode: Optional[str] = None
+    ClimateSeatCoolingFrontLeft: Optional[str] = None #unknown
+    ClimateSeatCoolingFrontRight: Optional[str] = None #unknown
+    CruiseFollowDistance: Optional[str] = None
+    CruiseSetSpeed: Optional[int] = None
+    CurrentLimitMph: Optional[int] = None
+    DCChargingEnergyIn: Optional[float] = None
+    DCChargingPower: Optional[float] = None
+    DCDCEnable: Optional[bool] = None
+    DefrostForPreconditioning: Optional[bool] = None
+    DefrostMode: Optional[str] = None
+    DestinationLocation: Optional[TeslaLocation] = None
+    DestinationName: Optional[str] = None
+    DetailedChargeState: Optional[str] = None
+    DiAxleSpeedF: Optional[float] = None
+    DiAxleSpeedR: Optional[float] = None
+    DiAxleSpeedREL: Optional[float] = None
+    DiAxleSpeedRER: Optional[float] = None
+    DiHeatsinkTF: Optional[float] = None
+    DiHeatsinkTR: Optional[float] = None
+    DiHeatsinkTREL: Optional[float] = None
+    DiHeatsinkTRER: Optional[float] = None
+    DiInverterTF: Optional[float] = None
+    DiInverterTR: Optional[float] = None
+    DiInverterTREL: Optional[float] = None
+    DiInverterTRER: Optional[float] = None
+    DiMotorCurrentF: Optional[float] = None
+    DiMotorCurrentR: Optional[float] = None
+    DiMotorCurrentREL: Optional[float] = None
+    DiMotorCurrentRER: Optional[float] = None
+    DiSlaveTorqueCmd: Optional[float] = None
+    DiStateF: Optional[str] = None
+    DiStateR: Optional[str] = None
+    DiStateREL: Optional[str] = None
+    DiStateRER: Optional[str] = None
+    DiStatorTempF: Optional[float] = None
+    DiStatorTempR: Optional[float] = None
+    DiStatorTempREL: Optional[float] = None
+    DiStatorTempRER: Optional[float] = None
+    DiTorqueActualF: Optional[float] = None
+    DiTorqueActualR: Optional[float] = None
+    DiTorqueActualREL: Optional[float] = None
+    DiTorqueActualRER: Optional[float] = None
+    DiTorquemotor: Optional[int] = None
+    DiVBatF: Optional[float] = None
+    DiVBatR: Optional[float] = None
+    DiVBatREL: Optional[float] = None
+    DiVBatRER: Optional[float] = None
+    DoorState: Optional[TeslaDoors] = None
+    DriveRail: Optional[bool] = None
+    DriverSeatBelt: Optional[bool] = None
+    DriverSeatOccupied: Optional[bool] = None
+    EfficiencyPackage: Optional[str] = None
+    EmergencyLaneDepartureAvoidance: Optional[bool] = None
+    EnergyRemaining: Optional[float] = None
+    EstBatteryRange: Optional[float] = None
+    EstimatedHoursToChargeTermination: Optional[float] = None
+    EuropeVehicle: Optional[bool] = None
+    ExpectedEnergyPercentAtTripArrival: Optional[int] = None
+    ExteriorColor: Optional[str] = None
+    FastChargerPresent: Optional[bool] = None
+    FastChargerType: Optional[str] = None
+    FdWindow: Optional[str] = None
+    ForwardCollisionWarning: Optional[str] = None
+    FpWindow: Optional[str] = None
+    Gear: Optional[str] = None
+    GpsHeading: Optional[float] = None
+    GpsState: Optional[bool] = None
+    GuestModeEnabled: Optional[bool] = None
+    GuestModeMobileAccessState: Optional[str] = None
+    HomelinkDeviceCount: Optional[int] = None
+    HomelinkNearby: Optional[bool] = None
+    HvacACEnabled: Optional[bool] = None
+    HvacAutoMode: Optional[str] = None
+    HvacFanSpeed: Optional[int] = None
+    HvacFanStatus: Optional[int] = None
+    HvacLeftTemperatureRequest: Optional[float] = None
+    HvacPower: Optional[str] = None
+    HvacRightTemperatureRequest: Optional[float] = None
+    HvacSteeringWheelHeatAuto: Optional[bool] = None
+    HvacSteeringWheelHeatLevel: Optional[str] = None #unknown
+    Hvil: Optional[str] = None
+    IdealBatteryRange: Optional[float] = None
+    InsideTemp: Optional[float] = None
+    IsolationResistance: Optional[float] = None
+    LaneDepartureAvoidance: Optional[str] = None
+    LateralAcceleration: Optional[float] = None
+    LifetimeEnergyUsed: Optional[float] = None
+    LifetimeEnergyUsedDrive: Optional[float] = None
+    LocatedAtFavorite: Optional[bool] = None
+    LocatedAtHome: Optional[bool] = None
+    LocatedAtWork: Optional[bool] = None
+    Location: Optional[TeslaLocation] = None
+    Locked: Optional[bool] = None
+    LongitudinalAcceleration: Optional[float] = None
+    MilesToArrival: Optional[float] = None
+    MinutesToArrival: Optional[float] = None
+    ModuleTempMax: Optional[float] = None
+    ModuleTempMin: Optional[float] = None
+    NotEnoughPowerToHeat: Optional[str] = None #unknown
+    NumBrickVoltageMax: Optional[int] = None
+    NumBrickVoltageMin: Optional[int] = None
+    NumModuleTempMax: Optional[int] = None
+    NumModuleTempMin: Optional[int] = None
+    Odometer: Optional[float] = None
+    OffroadLightbarPresent: Optional[bool] = None
+    OriginLocation: Optional[TeslaLocation] = None
+    OutsideTemp: Optional[float] = None
+    PackCurrent: Optional[float] = None
+    PackVoltage: Optional[float] = None
+    PairedPhoneKeyAndKeyFobQty: Optional[int] = None
+    PassengerSeatBelt: Optional[str] = None
+    PedalPosition: Optional[float] = None
+    PinToDriveEnabled: Optional[bool] = None
+    PowershareHoursLeft: Optional[float] = None
+    PowershareInstantaneousPowerKW: Optional[float] = None
+    PowershareStatus: Optional[str] = None
+    PowershareStopReason: Optional[str] = None
+    PowershareType: Optional[str] = None
+    PreconditioningEnabled: Optional[bool] = None
+    RatedRange: Optional[float] = None
+    RdWindow: Optional[str] = None
+    RearDisplayHvacEnabled: Optional[bool] = None
+    RearSeatHeaters: Optional[str] = None
+    RemoteStartEnabled: Optional[bool] = None
+    RightHandDrive: Optional[bool] = None
+    RoofColor: Optional[str] = None
+    RouteLastUpdated: Optional[int] = None
+    RouteTrafficMinutesDelay: Optional[int] = None
+    RpWindow: Optional[str] = None
+    ScheduledChargingMode: Optional[str] = None
+    ScheduledChargingPending: Optional[bool] = None
+    ScheduledChargingStartTime: Optional[str] = None #unknown
+    ScheduledDepartureTime: Optional[str] = None #unknown
+    SeatHeaterLeft: Optional[str] = None
+    SeatHeaterRearCenter: Optional[str] = None
+    SeatHeaterRearLeft: Optional[str] = None
+    SeatHeaterRearRight: Optional[str] = None
+    SeatHeaterRight: Optional[str] = None
+    SentryMode: Optional[str] = None
+    ServiceMode: Optional[bool] = None
+    Setting24HourTime: Optional[bool] = None
+    SettingChargeUnit: Optional[str] = None
+    SettingDistanceUnit: Optional[str] = None
+    SettingTemperatureUnit: Optional[str] = None
+    SettingTirePressureUnit: Optional[str] = None
+    Soc: Optional[float] = None
+    SoftwareUpdateDownloadPercentComplete: Optional[int] = None
+    SoftwareUpdateExpectedDurationMinutes: Optional[int] = None
+    SoftwareUpdateInstallationPercentComplete: Optional[int] = None
+    SoftwareUpdateScheduledStartTime: Optional[str] = None #
+    SoftwareUpdateVersion: Optional[str] = None
+    SpeedLimitMode: Optional[bool] = None
+    SpeedLimitWarning: Optional[str] = None
+    SuperchargerSessionTripPlanner: Optional[bool] = None
+    TimeToFullCharge: Optional[float] = None
+    TonneauOpenPercent: Optional[float] = None
+    TonneauPosition: Optional[str] = None
+    TonneauTentMode: Optional[str] = None
+    TpmsHardWarnings: Optional[int] = None
+    TpmsLastSeenPressureTimeFl: Optional[str] = None
+    TpmsLastSeenPressureTimeFr: Optional[str] = None
+    TpmsLastSeenPressureTimeRl: Optional[str] = None
+    TpmsLastSeenPressureTimeRr: Optional[str] = None
+    TpmsPressureFl: Optional[float] = None
+    TpmsPressureFr: Optional[float] = None
+    TpmsPressureRl: Optional[float] = None
+    TpmsPressureRr: Optional[float] = None
+    TpmsSoftWarnings: Optional[int] = None
+    Trim: Optional[str] = None
+    ValetModeEnabled: Optional[bool] = None
+    VehicleName: Optional[str] = None
+    VehicleSpeed: Optional[float] = None
+    Version: Optional[str] = None
+    WheelType: Optional[str] = None
+    WiperHeatEnabled: Optional[bool] = None
+
+@dataclass
+class TeslemetryStreamMessage:
+    """Data from a Fleet Telemetry stream"""
+
+    vin: str
+    createdAt: str
+    timestamp: Optional[int] = None
+    data: Optional[TeslaStreamData] = None
+    state: Optional[str] = None
+    status: Optional[str] = None
+    networkInterface: Optional[str] = None
+    vehicle_data: Optional[dict] = None
+
+    def __post_init__(self):
+        if self.data:
+            self.data = TeslaStreamData(**self.data)
+
+
+
+class TeslemetryEnum:
+    """Helper class to handle options for protobuf enums."""
+
+    prefix: str
+    options: list[str]
+    rawOptions: list[str]
+
+    def __init__(self, prefix: str, options: list[str]) -> None:
+        """Create a new options list."""
+        self.prefix = prefix
+        self.options = options
+        self.rawOptions = [f"{prefix}{option}" for option in options]
+
+    def get(self, value, default: str | None = None) -> str | None:
+        """Get the value if it is a valid option."""
+        if isinstance(value, str):
+            option = value.replace(self.prefix, "")
+            if option in self.options:
+                return option
+        return default
+
+ChargeState = TeslemetryEnum("ChargeState",[
+    'Unknown',
+    'Disconnected',
+    'NoPower',
+    'Starting',
+    'Charging',
+    'Complete',
+    'Stopped'
+])
+
+DetailedChargeState = TeslemetryEnum('DetailedChargeState',[
+    'Unknown',
+    'Disconnected',
+    'NoPower',
+    'Starting',
+    'Charging',
+    'Complete',
+    'Stopped'
+])
+
+ShiftState = TeslemetryEnum('ShiftState', [
+    'Unknown',
+    'Invalid',
+    'P',
+    'R',
+    'N',
+    'D',
+    'SNA'
+])
+
+FollowDistance = TeslemetryEnum('FollowDistance', [
+    'Unknown',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7'
+])
+
+ForwardCollisionSensitivity = TeslemetryEnum('ForwardCollisionSensitivity', [
+    'Unknown',
+    'Off',
+    'Late',
+    'Average',
+    'Early'
+])
+
+GuestModeMobileAccess = TeslemetryEnum('GuestModeMobileAccess', [
+    'Unknown',
+    'Init',
+    'NotAuthenticated',
+    'Authenticated',
+    'AbortedDriving',
+    'AbortedUsingRemoteStart',
+    'AbortedUsingBLEKeys',
+    'AbortedValetMode',
+    'AbortedGuestModeOff',
+    'AbortedDriveAuthTimeExceeded',
+    'AbortedNoDataReceived',
+    'RequestingFromMothership',
+    'RequestingFromAuthD',
+    'AbortedFetchFailed',
+    'AbortedBadDataReceived',
+    'ShowingQRCode',
+    'SwipedAway',
+    'DismissedQRCodeExpired',
+    'SucceededPairedNewBLEKey'
+])
+
+LaneAssistLevel = TeslemetryEnum('LaneAssistLevel', [
+    'Unknown',
+    'None',
+    'Warning',
+    'Assist'
+])
+
+ScheduledChargingMode = TeslemetryEnum('ScheduledChargingMode', [
+    'Unknown',
+    'Off',
+    'StartAt',
+    'DepartBy'
+])
+
+SentryModeState = TeslemetryEnum('SentryModeState', [
+    'Unknown',
+    'Off',
+    'Idle',
+    'Armed',
+    'Aware',
+    'Panic',
+    'Quiet'
+])
+
+SpeedAssistLevel = TeslemetryEnum('SpeedAssistLevel', [
+    'Unknown',
+    'None',
+    'Display',
+    'Chime'
+])
+
+BMSState = TeslemetryEnum('BMSState', [
+    'Unknown',
+    'Standby',
+    'Drive',
+    'Support',
+    'Charge',
+    'FEIM',
+    'ClearFault',
+    'Fault',
+    'Weld',
+    'Test',
+    'SNA'
+])
+
+BuckleStatus = TeslemetryEnum('BuckleStatus', [
+    'Unknown',
+    'Unlatched',
+    'Latched',
+    'Faulted'
+])
+
+CarType = TeslemetryEnum('CarType', [
+    'Unknown',
+    'ModelS',
+    'ModelX',
+    'Model3',
+    'ModelY',
+    'SemiTruck',
+    'Cybertruck'
+])
+
+ChargePort = TeslemetryEnum('ChargePort', [
+    'Unknown',
+    'US',
+    'EU',
+    'GB',
+    'CCS'
+])
+
+ChargePortLatch = TeslemetryEnum('ChargePortLatch', [
+    'Unknown',
+    'SNA',
+    'Disengaged',
+    'Engaged',
+    'Blocking'
+])
+
+DriveInverterState = TeslemetryEnum('DriveInverterState', [
+    'Unknown',
+    'Unavailable',
+    'Standby',
+    'Fault',
+    'Abort',
+    'Enable'
+])
+
+HvilStatus = TeslemetryEnum('HvilStatus', [
+    'Unknown',
+    'Fault',
+    'OK'
+])
+
+WindowState = TeslemetryEnum('WindowState', [
+    'Unknown',
+    'Closed',
+    'PartiallyOpen',
+    'Opened'
+])
+
+SeatFoldPosition = TeslemetryEnum('SeatFoldPosition', [
+    'Unknown',
+    'SNA',
+    'Faulted',
+    'NotConfigured',
+    'Folded',
+    'Unfolded'
+])
+
+TractorAirStatus = TeslemetryEnum('TractorAirStatus', [
+    'Unknown',
+    'NotAvailable',
+    'Error',
+    'Charged',
+    'BuildingPressureIntermediate',
+    'ExhaustingPressureIntermediate',
+    'Exhausted'
+])
+
+TrailerAirStatus = TeslemetryEnum('TrailerAirStatus', [
+    'Unknown',
+    'SNA',
+    'Invalid',
+    'BobtailMode',
+    'Charged',
+    'BuildingPressureIntermediate',
+    'ExhaustingPressureIntermediate',
+    'Exhausted'
+])
+
+HvacAutoModeState = TeslemetryEnum('HvacAutoModeState', [
+    'Unknown',
+    'On',
+    'Override'
+])
+
+CabinOverheatProtectionModeState = TeslemetryEnum('CabinOverheatProtectionModeState', [
+    'Unknown',
+    'Off',
+    'On',
+    'FanOnly'
+])
+
+ClimateOverheatProtectionTempLimit = TeslemetryEnum('ClimateOverheatProtectionTempLimit', [
+    'Unknown',
+    'High',
+    'Medium',
+    'Low'
+])
+
+DefrostModeState = TeslemetryEnum('DefrostModeState', [
+    'Unknown',
+    'Off',
+    'Normal',
+    'Max',
+    'AutoDefog'
+])
+
+ClimateKeeperModeState = TeslemetryEnum('ClimateKeeperModeState', [
+    'Unknown',
+    'Off',
+    'On',
+    'Dog',
+    'Party'
+])
+
+HvacPowerState = TeslemetryEnum('HvacPowerState', [
+    'Unknown',
+    'Off',
+    'On',
+    'Precondition',
+    'OverheatProtect'
+])
+
+FastCharger = TeslemetryEnum('FastCharger', [
+    'Unknown',
+    'Supercharger',
+    'CHAdeMO',
+    'GB',
+    'ACSingleWireCAN',
+    'Combo',
+    'MCSingleWireCAN',
+    'Other',
+    'SNA'
+])
+
+CableType = TeslemetryEnum('CableType', [
+    'Unknown',
+    'IEC',
+    'SAE',
+    'GB_AC',
+    'GB_DC',
+    'SNA'
+])
+
+TonneauTentModeState = TeslemetryEnum('TonneauTentModeState', [
+    'Unknown',
+    'Inactive',
+    'Moving',
+    'Failed',
+    'Active'
+])
+
+TonneauPositionState = TeslemetryEnum('TonneauPositionState', [
+    'Unknown',
+    'Invalid',
+    'Closed',
+    'PartiallyOpen',
+    'FullyOpen'
+])
+
+PowershareState = TeslemetryEnum('PowershareState', [
+    'Unknown',
+    'Inactive',
+    'Handshaking',
+    'Init',
+    'Enabled',
+    'EnabledReconnectingSoon',
+    'Stopped'
+])
+
+PowershareStopReasonStatus = TeslemetryEnum('PowershareStopReasonStatus', [
+    'Unknown',
+    'None',
+    'SOCTooLow',
+    'Retry',
+    'Fault',
+    'User',
+    'Reconnecting',
+    'Authentication'
+])
+
+PowershareTypeStatus = TeslemetryEnum('PowershareTypeStatus', [
+    'Unknown',
+    'None',
+    'Load',
+    'Home'
+])
+
+DisplayState = TeslemetryEnum('DisplayState', [
+    'Unknown',
+    'Off',
+    'Dim',
+    'Accessory',
+    'On',
+    'Driving',
+    'Charging',
+    'Lock',
+    'Sentry',
+    'Dog',
+    'Entertainment'
+])
+
+DistanceUnit = TeslemetryEnum('DistanceUnit', [
+    'Unknown',
+    'Miles',
+    'Kilometers'
+])
+
+TemperatureUnit = TeslemetryEnum('TemperatureUnit', [
+    'Unknown',
+    'Fahrenheit',
+    'Celsius'
+])
+
+PressureUnit = TeslemetryEnum('PressureUnit', [
+    'Unknown',
+    'Psi',
+    'Bar'
+])
+
+ChargeUnitPreference = TeslemetryEnum('ChargeUnit', [
+    'Unknown',
+    'Distance',
+    'Percent'
+])
