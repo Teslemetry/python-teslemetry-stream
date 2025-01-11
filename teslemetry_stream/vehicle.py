@@ -235,8 +235,8 @@ class TeslemetryStreamVehicle:
     def listen_BmsFullchargecomplete(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for BMS Full Charge Complete."""
         return self.stream.async_add_listener(
-            make_bool(Signal.BMS_FULLCHARGECOMPLETE, callback),
-            {"vin":self.vin, "data": {Signal.BMS_FULLCHARGECOMPLETE: None}}
+            make_bool(Signal.BMS_FULL_CHARGE_COMPLETE, callback),
+            {"vin":self.vin, "data": {Signal.BMS_FULL_CHARGE_COMPLETE: None}}
         )
 
     def listen_BrakePedal(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
