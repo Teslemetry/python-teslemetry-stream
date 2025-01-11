@@ -13,12 +13,14 @@ from .const import (
     ChargePort,
     ChargePortLatch,
     ChargeState,
+    ChargeUnitPreference,
     #ChargeUnitPreference,
     ClimateKeeperModeState,
     ClimateOverheatProtectionTempLimit,
     DefrostModeState,
     DetailedChargeState,
     DisplayState,
+    DistanceUnit,
     #DistanceUnit,
     DriveInverterState,
     FastCharger,
@@ -32,12 +34,14 @@ from .const import (
     PowershareState,
     PowershareStopReasonStatus,
     PowershareTypeStatus,
+    PressureUnit,
     #PressureUnit,
     ScheduledChargingMode,
     #SeatFoldPosition,
     SentryModeState,
     ShiftState,
     Signal,
+    TemperatureUnit,
     #SpeedAssistLevel,
     #TemperatureUnit,
     TeslaLocation,
@@ -1414,28 +1418,28 @@ class TeslemetryStreamVehicle:
     def listen_SettingChargeUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Charge Unit Setting."""
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SETTING_CHARGE_UNIT]),
+            lambda x: callback(ChargeUnitPreference.get(x['data'][Signal.SETTING_CHARGE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_CHARGE_UNIT: None}}
         )
 
     def listen_SettingDistanceUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Distance Unit Setting."""
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SETTING_DISTANCE_UNIT]),
+            lambda x: callback(DistanceUnit.get(x['data'][Signal.SETTING_DISTANCE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_DISTANCE_UNIT: None}}
         )
 
     def listen_SettingTemperatureUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Temperature Unit Setting."""
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SETTING_TEMPERATURE_UNIT]),
+            lambda x: callback(TemperatureUnit.get(x['data'][Signal.SETTING_TEMPERATURE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_TEMPERATURE_UNIT: None}}
         )
 
     def listen_SettingTirePressureUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Tire Pressure Unit Setting."""
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SETTING_TIRE_PRESSURE_UNIT]),
+            lambda x: callback(PressureUnit.get(x['data'][Signal.SETTING_TIRE_PRESSURE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_TIRE_PRESSURE_UNIT: None}}
         )
 

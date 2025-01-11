@@ -5,7 +5,6 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from teslemetry_stream.const import TeslemetryStreamMessage
 from .vehicle import TeslemetryStreamVehicle
 from .exception import TeslemetryStreamEnded
 
