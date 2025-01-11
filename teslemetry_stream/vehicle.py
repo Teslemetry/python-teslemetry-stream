@@ -1264,7 +1264,7 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.RATED_RANGE: None}}
         )
 
-    def listen_RdWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_RearDriverWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Rear Driver Window State."""
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.RD_WINDOW])),
@@ -1320,7 +1320,7 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.ROUTE_TRAFFIC_MINUTES_DELAY: None}}
         )
 
-    def listen_RpWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_RearPassengerWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Rear Passenger Window State."""
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.RP_WINDOW])),
