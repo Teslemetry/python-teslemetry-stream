@@ -86,12 +86,18 @@ class TeslemetryStreamVehicle:
         req = await self.stream._session.get(
             f"https://api.teslemetry.com/api/config/{self.vin}",
             headers=self.stream._headers,
-            raise_for_status=True,
+            raise_for_status=False,
         )
-        response = await req.json()
+        if req.status == 200:
+            response = await req.json()
 
-        self.fields = response.get("fields")
-        self.preferTyped = response.get("prefer_typed",False)
+            self.fields = response.get("fields")
+            self.preferTyped = response.get("prefer_typed",False)
+            return
+        if req.status == 404:
+            return
+
+        req.raise_for_status()
 
     async def update_config(self, config: dict) -> None:
         """Update the configuration for the vehicle."""
