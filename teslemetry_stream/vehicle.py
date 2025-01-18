@@ -162,17 +162,14 @@ class TeslemetryStreamVehicle:
     async def prefer_typed(self, prefer_typed: bool) -> None:
         """Set prefer typed."""
         if self.preferTyped == prefer_typed:
-            LOGGER.debug("Streaming typed already set to %s", prefer_typed)
             return
         await self.update_config({"prefer_typed": prefer_typed})
 
-    # Add listeners for each signal
-
     def _enable_field(self, field: Signal) -> None:
-        """Enable a field for streaming."""
-        if field.value not in self._config.get('fields', {}):
-            self._config.setdefault('fields', {})[field.value] = None
+        """Enable a field for streaming from a listener."""
+        asyncio.create_task(self.add_field(field))
 
+    # Add listeners for each signal
     def listen_ACChargingEnergyIn(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for AC Charging Energy In."""
         self._enable_field(Signal.AC_CHARGING_ENERGY_IN)
@@ -567,66 +564,66 @@ class TeslemetryStreamVehicle:
 
     def listen_DiHeatsinkTF(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Heatsink Temperature Front."""
-        self._enable_field(Signal.DI_HEATSINK_T_F)
+        self._enable_field(Signal.DI_HEATSINK_TF)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_HEATSINK_T_F, callback),
-            {"vin":self.vin, "data": {Signal.DI_HEATSINK_T_F: None}}
+            make_float(Signal.DI_HEATSINK_TF, callback),
+            {"vin":self.vin, "data": {Signal.DI_HEATSINK_TF: None}}
         )
 
     def listen_DiHeatsinkTR(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Heatsink Temperature Rear."""
-        self._enable_field(Signal.DI_HEATSINK_T_R)
+        self._enable_field(Signal.DI_HEATSINK_TR)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_HEATSINK_T_R, callback),
-            {"vin":self.vin, "data": {Signal.DI_HEATSINK_T_R: None}}
+            make_float(Signal.DI_HEATSINK_TR, callback),
+            {"vin":self.vin, "data": {Signal.DI_HEATSINK_TR: None}}
         )
 
     def listen_DiHeatsinkTREL(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Heatsink Temperature Rear Left."""
-        self._enable_field(Signal.DI_HEATSINK_T_REL)
+        self._enable_field(Signal.DI_HEATSINK_TREL)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_HEATSINK_T_REL, callback),
-            {"vin":self.vin, "data": {Signal.DI_HEATSINK_T_REL: None}}
+            make_float(Signal.DI_HEATSINK_TREL, callback),
+            {"vin":self.vin, "data": {Signal.DI_HEATSINK_TREL: None}}
         )
 
     def listen_DiHeatsinkTRER(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Heatsink Temperature Rear Right."""
-        self._enable_field(Signal.DI_HEATSINK_T_RER)
+        self._enable_field(Signal.DI_HEATSINK_TRER)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_HEATSINK_T_RER, callback),
-            {"vin":self.vin, "data": {Signal.DI_HEATSINK_T_RER: None}}
+            make_float(Signal.DI_HEATSINK_TRER, callback),
+            {"vin":self.vin, "data": {Signal.DI_HEATSINK_TRER: None}}
         )
 
     def listen_DiInverterTF(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Temperature Front."""
-        self._enable_field(Signal.DI_INVERTER_T_F)
+        self._enable_field(Signal.DI_INVERTER_TF)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_INVERTER_T_F, callback),
-            {"vin":self.vin, "data": {Signal.DI_INVERTER_T_F: None}}
+            make_float(Signal.DI_INVERTER_TF, callback),
+            {"vin":self.vin, "data": {Signal.DI_INVERTER_TF: None}}
         )
 
     def listen_DiInverterTR(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Temperature Rear."""
-        self._enable_field(Signal.DI_INVERTER_T_R)
+        self._enable_field(Signal.DI_INVERTER_TR)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_INVERTER_T_R, callback),
-            {"vin":self.vin, "data": {Signal.DI_INVERTER_T_R: None}}
+            make_float(Signal.DI_INVERTER_TR, callback),
+            {"vin":self.vin, "data": {Signal.DI_INVERTER_TR: None}}
         )
 
     def listen_DiInverterTREL(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Temperature Rear Left."""
-        self._enable_field(Signal.DI_INVERTER_T_REL)
+        self._enable_field(Signal.DI_INVERTER_TREL)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_INVERTER_T_REL, callback),
-            {"vin":self.vin, "data": {Signal.DI_INVERTER_T_REL: None}}
+            make_float(Signal.DI_INVERTER_TREL, callback),
+            {"vin":self.vin, "data": {Signal.DI_INVERTER_TREL: None}}
         )
 
     def listen_DiInverterTRER(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Drive Inverter Temperature Rear Right."""
-        self._enable_field(Signal.DI_INVERTER_T_RER)
+        self._enable_field(Signal.DI_INVERTER_TRER)
         return self.stream.async_add_listener(
-            make_float(Signal.DI_INVERTER_T_RER, callback),
-            {"vin":self.vin, "data": {Signal.DI_INVERTER_T_RER: None}}
+            make_float(Signal.DI_INVERTER_TRER, callback),
+            {"vin":self.vin, "data": {Signal.DI_INVERTER_TRER: None}}
         )
 
     def listen_DiMotorCurrentF(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
@@ -823,6 +820,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearDriverDoor(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Rear Driver Door State."""
+        self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.DOOR_STATE].get("DriverRear")),
             {"vin":self.vin, "data": {Signal.DOOR_STATE: None}}
@@ -830,6 +828,7 @@ class TeslemetryStreamVehicle:
 
     def listen_FrontPassengerDoor(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Front Passenger Door State."""
+        self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.DOOR_STATE].get("PassengerFront")),
             {"vin":self.vin, "data": {Signal.DOOR_STATE: None}}
@@ -837,6 +836,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearPassengerDoor(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Rear Passenger Door State."""
+        self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.DOOR_STATE].get("PassengerRear")),
             {"vin":self.vin, "data": {Signal.DOOR_STATE: None}}
@@ -844,6 +844,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TrunkFront(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Front Trunk Door State."""
+        self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.DOOR_STATE].get("TrunkFront")),
             {"vin":self.vin, "data": {Signal.DOOR_STATE: None}}
@@ -851,6 +852,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TrunkRear(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Rear Trunk Door State."""
+        self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.DOOR_STATE].get("TrunkRear")),
             {"vin":self.vin, "data": {Signal.DOOR_STATE: None}}
@@ -858,6 +860,7 @@ class TeslemetryStreamVehicle:
 
     def listen_DriveRail(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Drive Rail."""
+        self._enable_field(Signal.DRIVE_RAIL)
         return self.stream.async_add_listener(
             make_bool(Signal.DRIVE_RAIL, callback),
             {"vin":self.vin, "data": {Signal.DRIVE_RAIL: None}}
@@ -865,6 +868,7 @@ class TeslemetryStreamVehicle:
 
     def listen_DriverSeatBelt(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Driver Seat Belt."""
+        self._enable_field(Signal.DRIVER_SEAT_BELT)
         return self.stream.async_add_listener(
             make_bool(Signal.DRIVER_SEAT_BELT, callback), #BuckleStatus?
             {"vin":self.vin, "data": {Signal.DRIVER_SEAT_BELT: None}}
@@ -872,6 +876,7 @@ class TeslemetryStreamVehicle:
 
     def listen_DriverSeatOccupied(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Driver Seat Occupied."""
+        self._enable_field(Signal.DRIVER_SEAT_OCCUPIED)
         return self.stream.async_add_listener(
             make_bool(Signal.DRIVER_SEAT_OCCUPIED, callback),
             {"vin":self.vin, "data": {Signal.DRIVER_SEAT_OCCUPIED: None}}
@@ -879,6 +884,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EfficiencyPackage(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Efficiency Package."""
+        self._enable_field(Signal.EFFICIENCY_PACKAGE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.EFFICIENCY_PACKAGE]),
             {"vin":self.vin, "data": {Signal.EFFICIENCY_PACKAGE: None}}
@@ -886,6 +892,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EmergencyLaneDepartureAvoidance(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Emergency Lane Departure Avoidance."""
+        self._enable_field(Signal.EMERGENCY_LANE_DEPARTURE_AVOIDANCE)
         return self.stream.async_add_listener(
             make_bool(Signal.EMERGENCY_LANE_DEPARTURE_AVOIDANCE, callback),
             {"vin":self.vin, "data": {Signal.EMERGENCY_LANE_DEPARTURE_AVOIDANCE: None}}
@@ -893,6 +900,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EnergyRemaining(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Energy Remaining."""
+        self._enable_field(Signal.ENERGY_REMAINING)
         return self.stream.async_add_listener(
             make_float(Signal.ENERGY_REMAINING, callback),
             {"vin":self.vin, "data": {Signal.ENERGY_REMAINING: None}}
@@ -900,6 +908,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EstBatteryRange(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Estimated Battery Range."""
+        self._enable_field(Signal.EST_BATTERY_RANGE)
         return self.stream.async_add_listener(
             make_float(Signal.EST_BATTERY_RANGE, callback),
             {"vin":self.vin, "data": {Signal.EST_BATTERY_RANGE: None}}
@@ -907,6 +916,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EstimatedHoursToChargeTermination(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Estimated Hours to Charge Termination."""
+        self._enable_field(Signal.ESTIMATED_HOURS_TO_CHARGE_TERMINATION)
         return self.stream.async_add_listener(
             make_float(Signal.ESTIMATED_HOURS_TO_CHARGE_TERMINATION, callback),
             {"vin":self.vin, "data": {Signal.ESTIMATED_HOURS_TO_CHARGE_TERMINATION: None}}
@@ -914,6 +924,7 @@ class TeslemetryStreamVehicle:
 
     def listen_EuropeVehicle(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Europe Vehicle."""
+        self._enable_field(Signal.EUROPE_VEHICLE)
         return self.stream.async_add_listener(
             make_bool(Signal.EUROPE_VEHICLE, callback),
             {"vin":self.vin, "data": {Signal.EUROPE_VEHICLE: None}}
@@ -921,6 +932,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ExpectedEnergyPercentAtTripArrival(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Expected Energy Percent at Trip Arrival."""
+        self._enable_field(Signal.EXPECTED_ENERGY_PERCENT_AT_TRIP_ARRIVAL)
         return self.stream.async_add_listener(
             make_int(Signal.EXPECTED_ENERGY_PERCENT_AT_TRIP_ARRIVAL, callback),
             {"vin":self.vin, "data": {Signal.EXPECTED_ENERGY_PERCENT_AT_TRIP_ARRIVAL: None}}
@@ -928,6 +940,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ExteriorColor(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Exterior Color."""
+        self._enable_field(Signal.EXTERIOR_COLOR)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.EXTERIOR_COLOR]),
             {"vin":self.vin, "data": {Signal.EXTERIOR_COLOR: None}}
@@ -935,6 +948,7 @@ class TeslemetryStreamVehicle:
 
     def listen_FastChargerPresent(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Fast Charger Present."""
+        self._enable_field(Signal.FAST_CHARGER_PRESENT)
         return self.stream.async_add_listener(
             make_bool(x['data'][Signal.FAST_CHARGER_PRESENT], callback),
             {"vin":self.vin, "data": {Signal.FAST_CHARGER_PRESENT: None}}
@@ -942,6 +956,7 @@ class TeslemetryStreamVehicle:
 
     def listen_FastChargerType(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Fast Charger Type."""
+        self._enable_field(Signal.FAST_CHARGER_TYPE)
         return self.stream.async_add_listener(
             lambda x: callback(FastCharger.get(x['data'][Signal.FAST_CHARGER_TYPE])),
             {"vin":self.vin, "data": {Signal.FAST_CHARGER_TYPE: None}}
@@ -949,6 +964,7 @@ class TeslemetryStreamVehicle:
 
     def listen_FrontDriverWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Front Driver Window State."""
+        self._enable_field(Signal.FD_WINDOW)
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.FD_WINDOW])),
             {"vin":self.vin, "data": {Signal.FD_WINDOW: None}}
@@ -956,6 +972,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ForwardCollisionWarning(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Forward Collision Warning."""
+        self._enable_field(Signal.FORWARD_COLLISION_WARNING)
         return self.stream.async_add_listener(
             lambda x: callback(ForwardCollisionSensitivity.get(x['data'][Signal.FORWARD_COLLISION_WARNING])),
             {"vin":self.vin, "data": {Signal.FORWARD_COLLISION_WARNING: None}}
@@ -963,6 +980,7 @@ class TeslemetryStreamVehicle:
 
     def listen_FrontPassengerWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Front Passenger Window State."""
+        self._enable_field(Signal.FP_WINDOW)
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.FP_WINDOW])),
             {"vin":self.vin, "data": {Signal.FP_WINDOW: None}}
@@ -970,6 +988,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Gear(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Gear State."""
+        self._enable_field(Signal.GEAR)
         return self.stream.async_add_listener(
             lambda x: callback(ShiftState.get(x['data'][Signal.GEAR])),
             {"vin":self.vin, "data": {Signal.GEAR: None}}
@@ -977,6 +996,7 @@ class TeslemetryStreamVehicle:
 
     def listen_GpsHeading(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for GPS Heading."""
+        self._enable_field(Signal.GPS_HEADING)
         return self.stream.async_add_listener(
             make_float(Signal.GPS_HEADING, callback),
             {"vin":self.vin, "data": {Signal.GPS_HEADING: None}}
@@ -984,6 +1004,7 @@ class TeslemetryStreamVehicle:
 
     def listen_GpsState(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for GPS State."""
+        self._enable_field(Signal.GPS_STATE)
         return self.stream.async_add_listener(
             make_bool(Signal.GPS_STATE, callback),
             {"vin":self.vin, "data": {Signal.GPS_STATE: None}}
@@ -991,6 +1012,7 @@ class TeslemetryStreamVehicle:
 
     def listen_GuestModeEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Guest Mode Enabled."""
+        self._enable_field(Signal.GUEST_MODE_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.GUEST_MODE_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.GUEST_MODE_ENABLED: None}}
@@ -998,6 +1020,7 @@ class TeslemetryStreamVehicle:
 
     def listen_GuestModeMobileAccessState(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Guest Mode Mobile Access State."""
+        self._enable_field(Signal.GUEST_MODE_MOBILE_ACCESS_STATE)
         return self.stream.async_add_listener(
             lambda x: callback(GuestModeMobileAccess.get(x['data'][Signal.GUEST_MODE_MOBILE_ACCESS_STATE])),
             {"vin":self.vin, "data": {Signal.GUEST_MODE_MOBILE_ACCESS_STATE: None}}
@@ -1005,6 +1028,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HomelinkDeviceCount(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Homelink Device Count."""
+        self._enable_field(Signal.HOMELINK_DEVICE_COUNT)
         return self.stream.async_add_listener(
             make_int(Signal.HOMELINK_DEVICE_COUNT, callback),
             {"vin":self.vin, "data": {Signal.HOMELINK_DEVICE_COUNT: None}}
@@ -1012,6 +1036,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HomelinkNearby(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Homelink Nearby."""
+        self._enable_field(Signal.HOMELINK_NEARBY)
         return self.stream.async_add_listener(
             make_bool(Signal.HOMELINK_NEARBY, callback),
             {"vin":self.vin, "data": {Signal.HOMELINK_NEARBY: None}}
@@ -1019,6 +1044,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacACEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for HVAC AC Enabled."""
+        self._enable_field(Signal.HVAC_AC_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.HVAC_AC_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.HVAC_AC_ENABLED: None}}
@@ -1026,6 +1052,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacAutoMode(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for HVAC Auto Mode."""
+        self._enable_field(Signal.HVAC_AUTO_MODE)
         return self.stream.async_add_listener(
             lambda x: callback(HvacAutoModeState.get(x['data'][Signal.HVAC_AUTO_MODE])),
             {"vin":self.vin, "data": {Signal.HVAC_AUTO_MODE: None}}
@@ -1033,6 +1060,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacFanSpeed(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for HVAC Fan Speed."""
+        self._enable_field(Signal.HVAC_FAN_SPEED)
         return self.stream.async_add_listener(
             make_int(Signal.HVAC_FAN_SPEED, callback),
             {"vin":self.vin, "data": {Signal.HVAC_FAN_SPEED: None}}
@@ -1040,6 +1068,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacFanStatus(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for HVAC Fan Status."""
+        self._enable_field(Signal.HVAC_FAN_STATUS)
         return self.stream.async_add_listener(
             make_int(Signal.HVAC_FAN_STATUS, callback),
             {"vin":self.vin, "data": {Signal.HVAC_FAN_STATUS: None}}
@@ -1047,6 +1076,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacLeftTemperatureRequest(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for HVAC Left Temperature Request."""
+        self._enable_field(Signal.HVAC_LEFT_TEMPERATURE_REQUEST)
         return self.stream.async_add_listener(
             make_float(Signal.HVAC_LEFT_TEMPERATURE_REQUEST, callback),
             {"vin":self.vin, "data": {Signal.HVAC_LEFT_TEMPERATURE_REQUEST: None}}
@@ -1054,6 +1084,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacPower(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for HVAC Power."""
+        self._enable_field(Signal.HVAC_POWER)
         return self.stream.async_add_listener(
             lambda x: callback(HvacPowerState.get(x['data'][Signal.HVAC_POWER])),
             {"vin":self.vin, "data": {Signal.HVAC_POWER: None}}
@@ -1061,6 +1092,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacRightTemperatureRequest(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for HVAC Right Temperature Request."""
+        self._enable_field(Signal.HVAC_RIGHT_TEMPERATURE_REQUEST)
         return self.stream.async_add_listener(
             make_float(Signal.HVAC_RIGHT_TEMPERATURE_REQUEST, callback),
             {"vin":self.vin, "data": {Signal.HVAC_RIGHT_TEMPERATURE_REQUEST: None}}
@@ -1068,6 +1100,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacSteeringWheelHeatAuto(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for HVAC Steering Wheel Heat Auto."""
+        self._enable_field(Signal.HVAC_STEERING_WHEEL_HEAT_AUTO)
         return self.stream.async_add_listener(
             make_bool(Signal.HVAC_STEERING_WHEEL_HEAT_AUTO, callback),
             {"vin":self.vin, "data": {Signal.HVAC_STEERING_WHEEL_HEAT_AUTO: None}}
@@ -1075,6 +1108,7 @@ class TeslemetryStreamVehicle:
 
     def listen_HvacSteeringWheelHeatLevel(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for HVAC Steering Wheel Heat Level."""
+        self._enable_field(Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL]),
             {"vin":self.vin, "data": {Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL: None}}
@@ -1082,6 +1116,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Hvil(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for HVIL."""
+        self._enable_field(Signal.HVIL)
         return self.stream.async_add_listener(
             lambda x: callback(HvilStatus.get(x['data'][Signal.HVIL])),
             {"vin":self.vin, "data": {Signal.HVIL: None}}
@@ -1089,6 +1124,7 @@ class TeslemetryStreamVehicle:
 
     def listen_IdealBatteryRange(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Ideal Battery Range."""
+        self._enable_field(Signal.IDEAL_BATTERY_RANGE)
         return self.stream.async_add_listener(
             make_float(Signal.IDEAL_BATTERY_RANGE, callback),
             {"vin":self.vin, "data": {Signal.IDEAL_BATTERY_RANGE: None}}
@@ -1096,6 +1132,7 @@ class TeslemetryStreamVehicle:
 
     def listen_InsideTemp(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Inside Temperature."""
+        self._enable_field(Signal.INSIDE_TEMP)
         return self.stream.async_add_listener(
             make_float(Signal.INSIDE_TEMP, callback),
             {"vin":self.vin, "data": {Signal.INSIDE_TEMP: None}}
@@ -1103,6 +1140,7 @@ class TeslemetryStreamVehicle:
 
     def listen_IsolationResistance(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Isolation Resistance."""
+        self._enable_field(Signal.ISOLATION_RESISTANCE)
         return self.stream.async_add_listener(
             make_float(Signal.ISOLATION_RESISTANCE, callback),
             {"vin":self.vin, "data": {Signal.ISOLATION_RESISTANCE: None}}
@@ -1110,6 +1148,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LaneDepartureAvoidance(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Lane Departure Avoidance."""
+        self._enable_field(Signal.LANE_DEPARTURE_AVOIDANCE)
         return self.stream.async_add_listener(
             lambda x: callback(LaneAssistLevel.get(x['data'][Signal.LANE_DEPARTURE_AVOIDANCE])),
             {"vin":self.vin, "data": {Signal.LANE_DEPARTURE_AVOIDANCE: None}}
@@ -1117,6 +1156,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LateralAcceleration(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Lateral Acceleration."""
+        self._enable_field(Signal.LATERAL_ACCELERATION)
         return self.stream.async_add_listener(
             make_float(Signal.LATERAL_ACCELERATION, callback),
             {"vin":self.vin, "data": {Signal.LATERAL_ACCELERATION: None}}
@@ -1124,6 +1164,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LifetimeEnergyUsed(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Lifetime Energy Used."""
+        self._enable_field(Signal.LIFETIME_ENERGY_USED)
         return self.stream.async_add_listener(
             make_float(Signal.LIFETIME_ENERGY_USED, callback),
             {"vin":self.vin, "data": {Signal.LIFETIME_ENERGY_USED: None}}
@@ -1131,6 +1172,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LifetimeEnergyUsedDrive(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Lifetime Energy Used Drive."""
+        self._enable_field(Signal.LIFETIME_ENERGY_USED_DRIVE)
         return self.stream.async_add_listener(
             make_float(Signal.LIFETIME_ENERGY_USED_DRIVE, callback),
             {"vin":self.vin, "data": {Signal.LIFETIME_ENERGY_USED_DRIVE: None}}
@@ -1138,6 +1180,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LocatedAtFavorite(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Located At Favorite."""
+        self._enable_field(Signal.LOCATED_AT_FAVORITE)
         return self.stream.async_add_listener(
             make_bool(Signal.LOCATED_AT_FAVORITE, callback),
             {"vin":self.vin, "data": {Signal.LOCATED_AT_FAVORITE: None}}
@@ -1145,6 +1188,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LocatedAtHome(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Located At Home."""
+        self._enable_field(Signal.LOCATED_AT_HOME)
         return self.stream.async_add_listener(
             make_bool(Signal.LOCATED_AT_HOME, callback),
             {"vin":self.vin, "data": {Signal.LOCATED_AT_HOME: None}}
@@ -1152,6 +1196,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LocatedAtWork(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Located At Work."""
+        self._enable_field(Signal.LOCATED_AT_WORK)
         return self.stream.async_add_listener(
             make_bool(Signal.LOCATED_AT_WORK, callback),
             {"vin":self.vin, "data": {Signal.LOCATED_AT_WORK: None}}
@@ -1159,6 +1204,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Location(self, callback: Callable[[TeslaLocation | None], None]) -> Callable[[],None]:
         """Listen for Location."""
+        self._enable_field(Signal.LOCATION)
         return self.stream.async_add_listener(
             make_location(Signal.LOCATION, callback),
             {"vin":self.vin, "data": {Signal.LOCATION: None}}
@@ -1166,6 +1212,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Locked(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Locked."""
+        self._enable_field(Signal.LOCKED)
         return self.stream.async_add_listener(
             make_bool(Signal.LOCKED, callback),
             {"vin":self.vin, "data": {Signal.LOCKED: None}}
@@ -1173,6 +1220,7 @@ class TeslemetryStreamVehicle:
 
     def listen_LongitudinalAcceleration(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Longitudinal Acceleration."""
+        self._enable_field(Signal.LONGITUDINAL_ACCELERATION)
         return self.stream.async_add_listener(
             make_float(Signal.LONGITUDINAL_ACCELERATION, callback),
             {"vin":self.vin, "data": {Signal.LONGITUDINAL_ACCELERATION: None}}
@@ -1180,6 +1228,7 @@ class TeslemetryStreamVehicle:
 
     def listen_MilesToArrival(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Miles to Arrival."""
+        self._enable_field(Signal.MILES_TO_ARRIVAL)
         return self.stream.async_add_listener(
             make_float(Signal.MILES_TO_ARRIVAL, callback),
             {"vin":self.vin, "data": {Signal.MILES_TO_ARRIVAL: None}}
@@ -1187,6 +1236,7 @@ class TeslemetryStreamVehicle:
 
     def listen_MinutesToArrival(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Minutes to Arrival."""
+        self._enable_field(Signal.MINUTES_TO_ARRIVAL)
         return self.stream.async_add_listener(
             make_float(Signal.MINUTES_TO_ARRIVAL, callback),
             {"vin":self.vin, "data": {Signal.MINUTES_TO_ARRIVAL: None}}
@@ -1194,6 +1244,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ModuleTempMax(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Module Temperature Maximum."""
+        self._enable_field(Signal.MODULE_TEMP_MAX)
         return self.stream.async_add_listener(
             make_float(Signal.MODULE_TEMP_MAX, callback),
             {"vin":self.vin, "data": {Signal.MODULE_TEMP_MAX: None}}
@@ -1201,6 +1252,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ModuleTempMin(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Module Temperature Minimum."""
+        self._enable_field(Signal.MODULE_TEMP_MIN)
         return self.stream.async_add_listener(
             make_float(Signal.MODULE_TEMP_MIN, callback),
             {"vin":self.vin, "data": {Signal.MODULE_TEMP_MIN: None}}
@@ -1208,6 +1260,7 @@ class TeslemetryStreamVehicle:
 
     def listen_NotEnoughPowerToHeat(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Not Enough Power to Heat."""
+        self._enable_field(Signal.NOT_ENOUGH_POWER_TO_HEAT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.NOT_ENOUGH_POWER_TO_HEAT]),
             {"vin":self.vin, "data": {Signal.NOT_ENOUGH_POWER_TO_HEAT: None}}
@@ -1215,6 +1268,7 @@ class TeslemetryStreamVehicle:
 
     def listen_NumBrickVoltageMax(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Number of Brick Voltage Maximum."""
+        self._enable_field(Signal.NUM_BRICK_VOLTAGE_MAX)
         return self.stream.async_add_listener(
             make_int(Signal.NUM_BRICK_VOLTAGE_MAX, callback),
             {"vin":self.vin, "data": {Signal.NUM_BRICK_VOLTAGE_MAX: None}}
@@ -1222,6 +1276,7 @@ class TeslemetryStreamVehicle:
 
     def listen_NumBrickVoltageMin(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Number of Brick Voltage Minimum."""
+        self._enable_field(Signal.NUM_BRICK_VOLTAGE_MIN)
         return self.stream.async_add_listener(
             make_int(Signal.NUM_BRICK_VOLTAGE_MIN, callback),
             {"vin":self.vin, "data": {Signal.NUM_BRICK_VOLTAGE_MIN: None}}
@@ -1229,6 +1284,7 @@ class TeslemetryStreamVehicle:
 
     def listen_NumModuleTempMax(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Number of Module Temperature Maximum."""
+        self._enable_field(Signal.NUM_MODULE_TEMP_MAX)
         return self.stream.async_add_listener(
             make_int(Signal.NUM_MODULE_TEMP_MAX, callback),
             {"vin":self.vin, "data": {Signal.NUM_MODULE_TEMP_MAX: None}}
@@ -1236,6 +1292,7 @@ class TeslemetryStreamVehicle:
 
     def listen_NumModuleTempMin(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Number of Module Temperature Minimum."""
+        self._enable_field(Signal.NUM_MODULE_TEMP_MIN)
         return self.stream.async_add_listener(
             make_int(Signal.NUM_MODULE_TEMP_MIN, callback),
             {"vin":self.vin, "data": {Signal.NUM_MODULE_TEMP_MIN: None}}
@@ -1243,6 +1300,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Odometer(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Odometer."""
+        self._enable_field(Signal.ODOMETER)
         return self.stream.async_add_listener(
             make_float(Signal.ODOMETER, callback),
             {"vin":self.vin, "data": {Signal.ODOMETER: None}}
@@ -1250,6 +1308,7 @@ class TeslemetryStreamVehicle:
 
     def listen_OffroadLightbarPresent(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Offroad Lightbar Present."""
+        self._enable_field(Signal.OFFROAD_LIGHTBAR_PRESENT)
         return self.stream.async_add_listener(
             make_bool(Signal.OFFROAD_LIGHTBAR_PRESENT, callback),
             {"vin":self.vin, "data": {Signal.OFFROAD_LIGHTBAR_PRESENT: None}}
@@ -1257,6 +1316,7 @@ class TeslemetryStreamVehicle:
 
     def listen_OriginLocation(self, callback: Callable[[TeslaLocation | None], None]) -> Callable[[],None]:
         """Listen for Origin Location."""
+        self._enable_field(Signal.ORIGIN_LOCATION)
         return self.stream.async_add_listener(
             make_location(Signal.ORIGIN_LOCATION, callback),
             {"vin":self.vin, "data": {Signal.ORIGIN_LOCATION: None}}
@@ -1264,6 +1324,7 @@ class TeslemetryStreamVehicle:
 
     def listen_OutsideTemp(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Outside Temperature."""
+        self._enable_field(Signal.OUTSIDE_TEMP)
         return self.stream.async_add_listener(
             make_float(Signal.OUTSIDE_TEMP, callback),
             {"vin":self.vin, "data": {Signal.OUTSIDE_TEMP: None}}
@@ -1271,6 +1332,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PackCurrent(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Pack Current."""
+        self._enable_field(Signal.PACK_CURRENT)
         return self.stream.async_add_listener(
             make_float(Signal.PACK_CURRENT, callback),
             {"vin":self.vin, "data": {Signal.PACK_CURRENT: None}}
@@ -1278,6 +1340,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PackVoltage(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Pack Voltage."""
+        self._enable_field(Signal.PACK_VOLTAGE)
         return self.stream.async_add_listener(
             make_float(Signal.PACK_VOLTAGE, callback),
             {"vin":self.vin, "data": {Signal.PACK_VOLTAGE: None}}
@@ -1285,6 +1348,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PairedPhoneKeyAndKeyFobQty(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Paired Phone Key and Key Fob Quantity."""
+        self._enable_field(Signal.PAIRED_PHONE_KEY_AND_KEY_FOB_QTY)
         return self.stream.async_add_listener(
             make_int(Signal.PAIRED_PHONE_KEY_AND_KEY_FOB_QTY, callback),
             {"vin":self.vin, "data": {Signal.PAIRED_PHONE_KEY_AND_KEY_FOB_QTY: None}}
@@ -1292,6 +1356,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PassengerSeatBelt(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Passenger Seat Belt."""
+        self._enable_field(Signal.PASSENGER_SEAT_BELT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.PASSENGER_SEAT_BELT]),
             {"vin":self.vin, "data": {Signal.PASSENGER_SEAT_BELT: None}}
@@ -1299,6 +1364,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PedalPosition(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Pedal Position."""
+        self._enable_field(Signal.PEDAL_POSITION)
         return self.stream.async_add_listener(
             make_float(Signal.PEDAL_POSITION, callback),
             {"vin":self.vin, "data": {Signal.PEDAL_POSITION: None}}
@@ -1306,6 +1372,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PinToDriveEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Pin to Drive Enabled."""
+        self._enable_field(Signal.PIN_TO_DRIVE_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.PIN_TO_DRIVE_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.PIN_TO_DRIVE_ENABLED: None}}
@@ -1313,6 +1380,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PowershareHoursLeft(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Powershare Hours Left."""
+        self._enable_field(Signal.POWERSHARE_HOURS_LEFT)
         return self.stream.async_add_listener(
             make_float(Signal.POWERSHARE_HOURS_LEFT, callback),
             {"vin":self.vin, "data": {Signal.POWERSHARE_HOURS_LEFT: None}}
@@ -1320,6 +1388,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PowershareInstantaneousPowerKW(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Powershare Instantaneous Power kW."""
+        self._enable_field(Signal.POWERSHARE_INSTANTANEOUS_POWER_KW)
         return self.stream.async_add_listener(
             make_float(Signal.POWERSHARE_INSTANTANEOUS_POWER_KW, callback),
             {"vin":self.vin, "data": {Signal.POWERSHARE_INSTANTANEOUS_POWER_KW: None}}
@@ -1327,6 +1396,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PowershareStatus(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Powershare Status."""
+        self._enable_field(Signal.POWERSHARE_STATUS)
         return self.stream.async_add_listener(
             lambda x: callback(PowershareState.get(x['data'][Signal.POWERSHARE_STATUS])),
             {"vin":self.vin, "data": {Signal.POWERSHARE_STATUS: None}}
@@ -1334,6 +1404,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PowershareStopReason(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Powershare Stop Reason."""
+        self._enable_field(Signal.POWERSHARE_STOP_REASON)
         return self.stream.async_add_listener(
             lambda x: callback(PowershareStopReasonStatus.get(x['data'][Signal.POWERSHARE_STOP_REASON])),
             {"vin":self.vin, "data": {Signal.POWERSHARE_STOP_REASON: None}}
@@ -1341,6 +1412,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PowershareType(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Powershare Type."""
+        self._enable_field(Signal.POWERSHARE_TYPE)
         return self.stream.async_add_listener(
             lambda x: callback(PowershareTypeStatus.get(x['data'][Signal.POWERSHARE_TYPE])),
             {"vin":self.vin, "data": {Signal.POWERSHARE_TYPE: None}}
@@ -1348,6 +1420,7 @@ class TeslemetryStreamVehicle:
 
     def listen_PreconditioningEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Preconditioning Enabled."""
+        self._enable_field(Signal.PRECONDITIONING_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.PRECONDITIONING_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.PRECONDITIONING_ENABLED: None}}
@@ -1355,6 +1428,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RatedRange(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Rated Range."""
+        self._enable_field(Signal.RATED_RANGE)
         return self.stream.async_add_listener(
             make_float(Signal.RATED_RANGE, callback),
             {"vin":self.vin, "data": {Signal.RATED_RANGE: None}}
@@ -1362,6 +1436,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearDriverWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Rear Driver Window State."""
+        self._enable_field(Signal.RD_WINDOW)
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.RD_WINDOW])),
             {"vin":self.vin, "data": {Signal.RD_WINDOW: None}}
@@ -1369,6 +1444,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearDisplayHvacEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Rear Display HVAC Enabled."""
+        self._enable_field(Signal.REAR_DISPLAY_HVAC_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.REAR_DISPLAY_HVAC_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.REAR_DISPLAY_HVAC_ENABLED: None}}
@@ -1376,6 +1452,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearSeatHeaters(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Rear Seat Heaters."""
+        self._enable_field(Signal.REAR_SEAT_HEATERS)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.REAR_SEAT_HEATERS]),
             {"vin":self.vin, "data": {Signal.REAR_SEAT_HEATERS: None}}
@@ -1383,6 +1460,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RemoteStartEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Remote Start Enabled."""
+        self._enable_field(Signal.REMOTE_START_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.REMOTE_START_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.REMOTE_START_ENABLED: None}}
@@ -1390,6 +1468,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RightHandDrive(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Right Hand Drive."""
+        self._enable_field(Signal.RIGHT_HAND_DRIVE)
         return self.stream.async_add_listener(
             make_bool(Signal.RIGHT_HAND_DRIVE, callback),
             {"vin":self.vin, "data": {Signal.RIGHT_HAND_DRIVE: None}}
@@ -1397,6 +1476,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RoofColor(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Roof Color."""
+        self._enable_field(Signal.ROOF_COLOR)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.ROOF_COLOR]),
             {"vin":self.vin, "data": {Signal.ROOF_COLOR: None}}
@@ -1404,6 +1484,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RouteLastUpdated(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Route Last Updated."""
+        self._enable_field(Signal.ROUTE_LAST_UPDATED)
         return self.stream.async_add_listener(
             make_int(Signal.ROUTE_LAST_UPDATED, callback),
             {"vin":self.vin, "data": {Signal.ROUTE_LAST_UPDATED: None}}
@@ -1411,6 +1492,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RouteTrafficMinutesDelay(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Route Traffic Minutes Delay."""
+        self._enable_field(Signal.ROUTE_TRAFFIC_MINUTES_DELAY)
         return self.stream.async_add_listener(
             make_int(Signal.ROUTE_TRAFFIC_MINUTES_DELAY, callback),
             {"vin":self.vin, "data": {Signal.ROUTE_TRAFFIC_MINUTES_DELAY: None}}
@@ -1418,6 +1500,7 @@ class TeslemetryStreamVehicle:
 
     def listen_RearPassengerWindow(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Rear Passenger Window State."""
+        self._enable_field(Signal.RP_WINDOW)
         return self.stream.async_add_listener(
             lambda x: callback(WindowState.get(x['data'][Signal.RP_WINDOW])),
             {"vin":self.vin, "data": {Signal.RP_WINDOW: None}}
@@ -1425,6 +1508,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ScheduledChargingMode(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Scheduled Charging Mode."""
+        self._enable_field(Signal.SCHEDULED_CHARGING_MODE)
         return self.stream.async_add_listener(
             lambda x: callback(ScheduledChargingMode.get(x['data'][Signal.SCHEDULED_CHARGING_MODE])),
             {"vin":self.vin, "data": {Signal.SCHEDULED_CHARGING_MODE: None}}
@@ -1432,6 +1516,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ScheduledChargingPending(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Scheduled Charging Pending."""
+        self._enable_field(Signal.SCHEDULED_CHARGING_PENDING)
         return self.stream.async_add_listener(
             make_bool(Signal.SCHEDULED_CHARGING_PENDING, callback),
             {"vin":self.vin, "data": {Signal.SCHEDULED_CHARGING_PENDING: None}}
@@ -1439,6 +1524,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ScheduledChargingStartTime(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Scheduled Charging Start Time."""
+        self._enable_field(Signal.SCHEDULED_CHARGING_START_TIME)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SCHEDULED_CHARGING_START_TIME]),
             {"vin":self.vin, "data": {Signal.SCHEDULED_CHARGING_START_TIME: None}}
@@ -1446,6 +1532,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ScheduledDepartureTime(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Scheduled Departure Time."""
+        self._enable_field(Signal.SCHEDULED_DEPARTURE_TIME)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SCHEDULED_DEPARTURE_TIME]),
             {"vin":self.vin, "data": {Signal.SCHEDULED_DEPARTURE_TIME: None}}
@@ -1453,6 +1540,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SeatHeaterLeft(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Left."""
+        self._enable_field(Signal.SEAT_HEATER_LEFT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SEAT_HEATER_LEFT]),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_LEFT: None}}
@@ -1460,6 +1548,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SeatHeaterRearCenter(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Center."""
+        self._enable_field(Signal.SEAT_HEATER_REAR_CENTER)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_CENTER]),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_CENTER: None}}
@@ -1467,6 +1556,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SeatHeaterRearLeft(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Left."""
+        self._enable_field(Signal.SEAT_HEATER_REAR_LEFT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_LEFT]),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_LEFT: None}}
@@ -1474,6 +1564,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SeatHeaterRearRight(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Right."""
+        self._enable_field(Signal.SEAT_HEATER_REAR_RIGHT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_RIGHT]),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_RIGHT: None}}
@@ -1481,6 +1572,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SeatHeaterRight(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Right."""
+        self._enable_field(Signal.SEAT_HEATER_RIGHT)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SEAT_HEATER_RIGHT]),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_RIGHT: None}}
@@ -1488,6 +1580,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SentryMode(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Sentry Mode."""
+        self._enable_field(Signal.SENTRY_MODE)
         return self.stream.async_add_listener(
             lambda x: callback(SentryModeState.get(x['data'][Signal.SENTRY_MODE])),
             {"vin":self.vin, "data": {Signal.SENTRY_MODE: None}}
@@ -1495,6 +1588,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ServiceMode(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Service Mode."""
+        self._enable_field(Signal.SERVICE_MODE)
         return self.stream.async_add_listener(
             make_bool(Signal.SERVICE_MODE, callback),
             {"vin":self.vin, "data": {Signal.SERVICE_MODE: None}}
@@ -1502,6 +1596,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Setting24HourTime(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for 24 Hour Time Setting."""
+        self._enable_field(Signal.SETTING_24_HOUR_TIME)
         return self.stream.async_add_listener(
             make_bool(Signal.SETTING_24_HOUR_TIME, callback),
             {"vin":self.vin, "data": {Signal.SETTING_24_HOUR_TIME: None}}
@@ -1509,6 +1604,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SettingChargeUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Charge Unit Setting."""
+        self._enable_field(Signal.SETTING_CHARGE_UNIT)
         return self.stream.async_add_listener(
             lambda x: callback(ChargeUnitPreference.get(x['data'][Signal.SETTING_CHARGE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_CHARGE_UNIT: None}}
@@ -1516,6 +1612,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SettingDistanceUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Distance Unit Setting."""
+        self._enable_field(Signal.SETTING_DISTANCE_UNIT)
         return self.stream.async_add_listener(
             lambda x: callback(DistanceUnit.get(x['data'][Signal.SETTING_DISTANCE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_DISTANCE_UNIT: None}}
@@ -1523,6 +1620,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SettingTemperatureUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Temperature Unit Setting."""
+        self._enable_field(Signal.SETTING_TEMPERATURE_UNIT)
         return self.stream.async_add_listener(
             lambda x: callback(TemperatureUnit.get(x['data'][Signal.SETTING_TEMPERATURE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_TEMPERATURE_UNIT: None}}
@@ -1530,6 +1628,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SettingTirePressureUnit(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Tire Pressure Unit Setting."""
+        self._enable_field(Signal.SETTING_TIRE_PRESSURE_UNIT)
         return self.stream.async_add_listener(
             lambda x: callback(PressureUnit.get(x['data'][Signal.SETTING_TIRE_PRESSURE_UNIT])),
             {"vin":self.vin, "data": {Signal.SETTING_TIRE_PRESSURE_UNIT: None}}
@@ -1537,6 +1636,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Soc(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for State of Charge."""
+        self._enable_field(Signal.SOC)
         return self.stream.async_add_listener(
             make_float(Signal.SOC, callback),
             {"vin":self.vin, "data": {Signal.SOC: None}}
@@ -1544,6 +1644,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SoftwareUpdateDownloadPercentComplete(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Software Update Download Percent Complete."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_DOWNLOAD_PERCENT_COMPLETE)
         return self.stream.async_add_listener(
             make_int(Signal.SOFTWARE_UPDATE_DOWNLOAD_PERCENT_COMPLETE, callback),
             {"vin":self.vin, "data": {Signal.SOFTWARE_UPDATE_DOWNLOAD_PERCENT_COMPLETE: None}}
@@ -1551,6 +1652,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SoftwareUpdateExpectedDurationMinutes(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Software Update Expected Duration Minutes."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_EXPECTED_DURATION_MINUTES)
         return self.stream.async_add_listener(
             make_int(Signal.SOFTWARE_UPDATE_EXPECTED_DURATION_MINUTES, callback),
             {"vin":self.vin, "data": {Signal.SOFTWARE_UPDATE_EXPECTED_DURATION_MINUTES: None}}
@@ -1558,6 +1660,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SoftwareUpdateInstallationPercentComplete(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Software Update Installation Percent Complete."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_INSTALLATION_PERCENT_COMPLETE)
         return self.stream.async_add_listener(
             make_int(Signal.SOFTWARE_UPDATE_INSTALLATION_PERCENT_COMPLETE, callback),
             {"vin":self.vin, "data": {Signal.SOFTWARE_UPDATE_INSTALLATION_PERCENT_COMPLETE: None}}
@@ -1565,6 +1668,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SoftwareUpdateScheduledStartTime(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Software Update Scheduled Start Time."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME]),
             {"vin":self.vin, "data": {Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME: None}}
@@ -1572,6 +1676,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SoftwareUpdateVersion(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Software Update Version."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_VERSION)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SOFTWARE_UPDATE_VERSION]),
             {"vin":self.vin, "data": {Signal.SOFTWARE_UPDATE_VERSION: None}}
@@ -1579,6 +1684,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SpeedLimitMode(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Speed Limit Mode."""
+        self._enable_field(Signal.SPEED_LIMIT_MODE)
         return self.stream.async_add_listener(
             make_bool(Signal.SPEED_LIMIT_MODE, callback),
             {"vin":self.vin, "data": {Signal.SPEED_LIMIT_MODE: None}}
@@ -1586,6 +1692,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SpeedLimitWarning(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Speed Limit Warning."""
+        self._enable_field(Signal.SPEED_LIMIT_WARNING)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.SPEED_LIMIT_WARNING]),
             {"vin":self.vin, "data": {Signal.SPEED_LIMIT_WARNING: None}}
@@ -1593,6 +1700,7 @@ class TeslemetryStreamVehicle:
 
     def listen_SuperchargerSessionTripPlanner(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Supercharger Session Trip Planner."""
+        self._enable_field(Signal.SUPERCHARGER_SESSION_TRIP_PLANNER)
         return self.stream.async_add_listener(
             make_bool(Signal.SUPERCHARGER_SESSION_TRIP_PLANNER, callback),
             {"vin":self.vin, "data": {Signal.SUPERCHARGER_SESSION_TRIP_PLANNER: None}}
@@ -1600,6 +1708,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TimeToFullCharge(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Time to Full Charge."""
+        self._enable_field(Signal.TIME_TO_FULL_CHARGE)
         return self.stream.async_add_listener(
             make_float(Signal.TIME_TO_FULL_CHARGE, callback),
             {"vin":self.vin, "data": {Signal.TIME_TO_FULL_CHARGE: None}}
@@ -1607,6 +1716,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TonneauOpenPercent(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Tonneau Open Percent."""
+        self._enable_field(Signal.TONNEAU_OPEN_PERCENT)
         return self.stream.async_add_listener(
             make_float(Signal.TONNEAU_OPEN_PERCENT, callback),
             {"vin":self.vin, "data": {Signal.TONNEAU_OPEN_PERCENT: None}}
@@ -1614,6 +1724,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TonneauPosition(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Tonneau Position."""
+        self._enable_field(Signal.TONNEAU_POSITION)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TONNEAU_POSITION]),
             {"vin":self.vin, "data": {Signal.TONNEAU_POSITION: None}}
@@ -1621,6 +1732,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TonneauTentMode(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Tonneau Tent Mode."""
+        self._enable_field(Signal.TONNEAU_TENT_MODE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TONNEAU_TENT_MODE]),
             {"vin":self.vin, "data": {Signal.TONNEAU_TENT_MODE: None}}
@@ -1628,6 +1740,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsHardWarnings(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for TPMS Hard Warnings."""
+        self._enable_field(Signal.TPMS_HARD_WARNINGS)
         return self.stream.async_add_listener(
             make_int(Signal.TPMS_HARD_WARNINGS, callback),
             {"vin":self.vin, "data": {Signal.TPMS_HARD_WARNINGS: None}}
@@ -1635,6 +1748,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsLastSeenPressureTimeFl(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Front Left."""
+        self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL]),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL: None}}
@@ -1642,6 +1756,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsLastSeenPressureTimeFr(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Front Right."""
+        self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR]),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR: None}}
@@ -1649,6 +1764,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsLastSeenPressureTimeRl(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Rear Left."""
+        self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL]),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL: None}}
@@ -1656,6 +1772,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsLastSeenPressureTimeRr(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Rear Right."""
+        self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR]),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR: None}}
@@ -1663,6 +1780,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsPressureFl(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for TPMS Pressure Front Left."""
+        self._enable_field(Signal.TPMS_PRESSURE_FL)
         return self.stream.async_add_listener(
             make_float(Signal.TPMS_PRESSURE_FL, callback),
             {"vin":self.vin, "data": {Signal.TPMS_PRESSURE_FL: None}}
@@ -1670,6 +1788,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsPressureFr(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for TPMS Pressure Front Right."""
+        self._enable_field(Signal.TPMS_PRESSURE_FR)
         return self.stream.async_add_listener(
             make_float(Signal.TPMS_PRESSURE_FR, callback),
             {"vin":self.vin, "data": {Signal.TPMS_PRESSURE_FR: None}}
@@ -1677,6 +1796,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsPressureRl(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for TPMS Pressure Rear Left."""
+        self._enable_field(Signal.TPMS_PRESSURE_RL)
         return self.stream.async_add_listener(
             make_float(Signal.TPMS_PRESSURE_RL, callback),
             {"vin":self.vin, "data": {Signal.TPMS_PRESSURE_RL: None}}
@@ -1684,6 +1804,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsPressureRr(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for TPMS Pressure Rear Right."""
+        self._enable_field(Signal.TPMS_PRESSURE_RR)
         return self.stream.async_add_listener(
             make_float(Signal.TPMS_PRESSURE_RR, callback),
             {"vin":self.vin, "data": {Signal.TPMS_PRESSURE_RR: None}}
@@ -1691,6 +1812,7 @@ class TeslemetryStreamVehicle:
 
     def listen_TpmsSoftWarnings(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for TPMS Soft Warnings."""
+        self._enable_field(Signal.TPMS_SOFT_WARNINGS)
         return self.stream.async_add_listener(
             make_int(Signal.TPMS_SOFT_WARNINGS, callback),
             {"vin":self.vin, "data": {Signal.TPMS_SOFT_WARNINGS: None}}
@@ -1698,6 +1820,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Trim(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Trim."""
+        self._enable_field(Signal.TRIM)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.TRIM]),
             {"vin":self.vin, "data": {Signal.TRIM: None}}
@@ -1705,6 +1828,7 @@ class TeslemetryStreamVehicle:
 
     def listen_ValetModeEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Valet Mode Enabled."""
+        self._enable_field(Signal.VALET_MODE_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.VALET_MODE_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.VALET_MODE_ENABLED: None}}
@@ -1712,6 +1836,7 @@ class TeslemetryStreamVehicle:
 
     def listen_VehicleName(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Vehicle Name."""
+        self._enable_field(Signal.VEHICLE_NAME)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.VEHICLE_NAME]),
             {"vin":self.vin, "data": {Signal.VEHICLE_NAME: None}}
@@ -1719,6 +1844,7 @@ class TeslemetryStreamVehicle:
 
     def listen_VehicleSpeed(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
         """Listen for Vehicle Speed."""
+        self._enable_field(Signal.VEHICLE_SPEED)
         return self.stream.async_add_listener(
             make_float(Signal.VEHICLE_SPEED, callback),
             {"vin":self.vin, "data": {Signal.VEHICLE_SPEED: None}}
@@ -1726,6 +1852,7 @@ class TeslemetryStreamVehicle:
 
     def listen_Version(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Version."""
+        self._enable_field(Signal.VERSION)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.VERSION]),
             {"vin":self.vin, "data": {Signal.VERSION: None}}
@@ -1733,6 +1860,7 @@ class TeslemetryStreamVehicle:
 
     def listen_WheelType(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Wheel Type."""
+        self._enable_field(Signal.WHEEL_TYPE)
         return self.stream.async_add_listener(
             lambda x: callback(x['data'][Signal.WHEEL_TYPE]),
             {"vin":self.vin, "data": {Signal.WHEEL_TYPE: None}}
@@ -1740,6 +1868,7 @@ class TeslemetryStreamVehicle:
 
     def listen_WiperHeatEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Wiper Heat Enabled."""
+        self._enable_field(Signal.WIPER_HEAT_ENABLED)
         return self.stream.async_add_listener(
             make_bool(Signal.WIPER_HEAT_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.WIPER_HEAT_ENABLED: None}}
