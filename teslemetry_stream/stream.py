@@ -202,6 +202,22 @@ class TeslemetryStream:
                             LOGGER.error("Uncaught error in listener: %s", error)
         LOGGER.debug("Listen has finished")
 
+    def listen_Credits(self, callback: Callable[[dict[str, str | int]], None]) -> Callable[[], None]:
+        """Listen for credits update."""
+
+        return self.async_add_listener(
+            lambda x: callback(x["credits"]),
+            {"credits": None}
+        )
+
+    def listen_Balance(self, callback: Callable[[int], None]) -> Callable[[], None]:
+        """Listen for credits balance."""
+
+        return self.async_add_listener(
+            lambda x: callback(x["credits"]["balance"]),
+            {"credits": {"balance": None}}
+        )
+
 def recursive_match(dict1, dict2):
     """Recursively match dict1 with dict2."""
     if dict1 is not None:
