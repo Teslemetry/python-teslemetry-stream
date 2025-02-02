@@ -1538,43 +1538,43 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.SCHEDULED_DEPARTURE_TIME: None}}
         )
 
-    def listen_SeatHeaterLeft(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_SeatHeaterLeft(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Left."""
         self._enable_field(Signal.SEAT_HEATER_LEFT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SEAT_HEATER_LEFT]),
+            make_int(Signal.SEAT_HEATER_LEFT,callback),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_LEFT: None}}
         )
 
-    def listen_SeatHeaterRearCenter(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_SeatHeaterRearCenter(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Center."""
         self._enable_field(Signal.SEAT_HEATER_REAR_CENTER)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_CENTER]),
+            make_int(Signal.SEAT_HEATER_REAR_CENTER, callback),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_CENTER: None}}
         )
 
-    def listen_SeatHeaterRearLeft(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_SeatHeaterRearLeft(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Left."""
         self._enable_field(Signal.SEAT_HEATER_REAR_LEFT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_LEFT]),
+            make_int(Signal.SEAT_HEATER_REAR_LEFT, callback),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_LEFT: None}}
         )
 
-    def listen_SeatHeaterRearRight(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_SeatHeaterRearRight(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Rear Right."""
         self._enable_field(Signal.SEAT_HEATER_REAR_RIGHT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SEAT_HEATER_REAR_RIGHT]),
+            make_int(Signal.SEAT_HEATER_REAR_RIGHT, callback),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_REAR_RIGHT: None}}
         )
 
-    def listen_SeatHeaterRight(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_SeatHeaterRight(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for Seat Heater Right."""
         self._enable_field(Signal.SEAT_HEATER_RIGHT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SEAT_HEATER_RIGHT]),
+            make_int(Signal.SEAT_HEATER_RIGHT, callback),
             {"vin":self.vin, "data": {Signal.SEAT_HEATER_RIGHT: None}}
         )
 
