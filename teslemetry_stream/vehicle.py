@@ -950,7 +950,7 @@ class TeslemetryStreamVehicle:
         """Listen for Fast Charger Present."""
         self._enable_field(Signal.FAST_CHARGER_PRESENT)
         return self.stream.async_add_listener(
-            make_bool(x['data'][Signal.FAST_CHARGER_PRESENT], callback),
+            make_bool(Signal.FAST_CHARGER_PRESENT, callback),
             {"vin":self.vin, "data": {Signal.FAST_CHARGER_PRESENT: None}}
         )
 
@@ -1106,11 +1106,11 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.HVAC_STEERING_WHEEL_HEAT_AUTO: None}}
         )
 
-    def listen_HvacSteeringWheelHeatLevel(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_HvacSteeringWheelHeatLevel(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
         """Listen for HVAC Steering Wheel Heat Level."""
         self._enable_field(Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL]),
+            make_int(Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL,callback),
             {"vin":self.vin, "data": {Signal.HVAC_STEERING_WHEEL_HEAT_LEVEL: None}}
         )
 
