@@ -484,10 +484,10 @@ class TeslemetryStreamVehicle:
 
     def listen_DCDCEnable(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for DC DC Enable."""
-        self._enable_field(Signal.DCDC_ENABLE)
+        self._enable_field(Signal.DC_DC_ENABLE)
         return self.stream.async_add_listener(
-            make_bool(Signal.DCDC_ENABLE, callback),
-            {"vin":self.vin, "data": {Signal.DCDC_ENABLE: None}}
+            make_bool(Signal.DC_DC_ENABLE, callback),
+            {"vin":self.vin, "data": {Signal.DC_DC_ENABLE: None}}
         )
 
     def listen_DefrostForPreconditioning(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
