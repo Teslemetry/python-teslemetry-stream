@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Callable
 
 from .const import (
     BMSState,
-    #BuckleStatus,
     CabinOverheatProtectionModeState,
     CableType,
     CarType,
@@ -14,14 +13,12 @@ from .const import (
     ChargePortLatch,
     ChargeState,
     ChargeUnitPreference,
-    #ChargeUnitPreference,
     ClimateKeeperModeState,
     ClimateOverheatProtectionTempLimit,
     DefrostModeState,
     DetailedChargeState,
     DisplayState,
     DistanceUnit,
-    #DistanceUnit,
     DriveInverterState,
     FastCharger,
     FollowDistance,
@@ -35,21 +32,15 @@ from .const import (
     PowershareStopReasonStatus,
     PowershareTypeStatus,
     PressureUnit,
-    #PressureUnit,
     ScheduledChargingMode,
-    #SeatFoldPosition,
     SentryModeState,
     ShiftState,
     Signal,
+    SunroofInstalledState,
     TemperatureUnit,
-    #SpeedAssistLevel,
-    #TemperatureUnit,
     TeslaLocation,
-    #TonneauPositionState,
-    #TonneauTentModeState,
-    #TractorAirStatus,
-    #TrailerAirStatus,
     WindowState,
+    MediaStatus
 )
 
 if TYPE_CHECKING:
@@ -1872,6 +1863,150 @@ class TeslemetryStreamVehicle:
         return self.stream.async_add_listener(
             make_bool(Signal.WIPER_HEAT_ENABLED, callback),
             {"vin":self.vin, "data": {Signal.WIPER_HEAT_ENABLED: None}}
+        )
+
+    def listen_LightsHazardsActive(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
+        """Listen for Lights Hazards Active."""
+        self._enable_field(Signal.LIGHTS_HAZARDS_ACTIVE)
+        return self.stream.async_add_listener(
+            make_bool(Signal.LIGHTS_HAZARDS_ACTIVE, callback),
+            {"vin":self.vin, "data": {Signal.LIGHTS_HAZARDS_ACTIVE: None}}
+        )
+
+    def listen_LightsTurnSignal(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Lights Turn Signal."""
+        self._enable_field(Signal.LIGHTS_TURN_SIGNAL)
+        return self.stream.async_add_listener(
+            lambda x: callback(TurnSignalState.get(x['data'][Signal.LIGHTS_TURN_SIGNAL])),
+            {"vin":self.vin, "data": {Signal.LIGHTS_TURN_SIGNAL: None}}
+        )
+
+    def listen_LightsHighBeams(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
+        """Listen for Lights High Beams."""
+        self._enable_field(Signal.LIGHTS_HIGH_BEAMS)
+        return self.stream.async_add_listener(
+            make_bool(Signal.LIGHTS_HIGH_BEAMS, callback),
+            {"vin":self.vin, "data": {Signal.LIGHTS_HIGH_BEAMS: None}}
+        )
+
+    def listen_MediaPlaybackStatus(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Playback Status."""
+        self._enable_field(Signal.MEDIA_PLAYBACK_STATUS)
+        return self.stream.async_add_listener(
+            lambda x: callback(MediaStatus.get(x['data'][Signal.MEDIA_PLAYBACK_STATUS])),
+            {"vin":self.vin, "data": {Signal.MEDIA_PLAYBACK_STATUS: None}}
+        )
+
+    def listen_MediaPlaybackSource(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Playback Source."""
+        self._enable_field(Signal.MEDIA_PLAYBACK_SOURCE)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.MEDIA_PLAYBACK_SOURCE]),
+            {"vin":self.vin, "data": {Signal.MEDIA_PLAYBACK_SOURCE: None}}
+        )
+
+    def listen_MediaAudioVolume(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
+        """Listen for Media Audio Volume."""
+        self._enable_field(Signal.MEDIA_AUDIO_VOLUME)
+        return self.stream.async_add_listener(
+            make_float(Signal.MEDIA_AUDIO_VOLUME, callback),
+            {"vin":self.vin, "data": {Signal.MEDIA_AUDIO_VOLUME: None}}
+        )
+
+    def listen_MediaNowPlayingDuration(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Duration."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_DURATION)
+        return self.stream.async_add_listener(
+            make_int(Signal.MEDIA_NOW_PLAYING_DURATION, callback),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_DURATION: None}}
+        )
+
+    def listen_MediaNowPlayingElapsed(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Elapsed."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_ELAPSED)
+        return self.stream.async_add_listener(
+            make_int(Signal.MEDIA_NOW_PLAYING_ELAPSED, callback),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_ELAPSED: None}}
+        )
+
+    def listen_MediaNowPlayingArtist(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Artist."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_ARTIST)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.MEDIA_NOW_PLAYING_ARTIST]),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_ARTIST: None}}
+        )
+
+    def listen_MediaNowPlayingTitle(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Title."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_TITLE)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.MEDIA_NOW_PLAYING_TITLE]),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_TITLE: None}}
+        )
+
+    def listen_MediaNowPlayingAlbum(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Album."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_ALBUM)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.MEDIA_NOW_PLAYING_ALBUM]),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_ALBUM: None}}
+        )
+
+    def listen_MediaNowPlayingStation(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Media Now Playing Station."""
+        self._enable_field(Signal.MEDIA_NOW_PLAYING_STATION)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.MEDIA_NOW_PLAYING_STATION]),
+            {"vin":self.vin, "data": {Signal.MEDIA_NOW_PLAYING_STATION: None}}
+        )
+
+    def listen_MediaAudioVolumeIncrement(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
+        """Listen for Media Audio Volume Increment."""
+        self._enable_field(Signal.MEDIA_AUDIO_VOLUME_INCREMENT)
+        return self.stream.async_add_listener(
+            make_float(Signal.MEDIA_AUDIO_VOLUME_INCREMENT, callback),
+            {"vin":self.vin, "data": {Signal.MEDIA_AUDIO_VOLUME_INCREMENT: None}}
+        )
+
+    def listen_MediaAudioVolumeMax(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
+        """Listen for Media Audio Volume Maximum."""
+        self._enable_field(Signal.MEDIA_AUDIO_VOLUME_MAX)
+        return self.stream.async_add_listener(
+            make_float(Signal.MEDIA_AUDIO_VOLUME_MAX, callback),
+            {"vin":self.vin, "data": {Signal.MEDIA_AUDIO_VOLUME_MAX: None}}
+        )
+
+    def listen_SunroofInstalled(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Sunroof Installed."""
+        self._enable_field(Signal.SUNROOF_INSTALLED)
+        return self.stream.async_add_listener(
+            lambda x: callback(SunroofInstalledState.get(x['data'][Signal.SUNROOF_INSTALLED])),
+            {"vin":self.vin, "data": {Signal.SUNROOF_INSTALLED: None}}
+        )
+
+    def listen_SeatVentEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
+        """Listen for Seat Vent Enabled."""
+        self._enable_field(Signal.SEAT_VENT_ENABLED)
+        return self.stream.async_add_listener(
+            make_bool(Signal.SEAT_VENT_ENABLED, callback),
+            {"vin":self.vin, "data": {Signal.SEAT_VENT_ENABLED: None}}
+        )
+
+    def listen_RearDefrostEnabled(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
+        """Listen for Rear Defrost Enabled."""
+        self._enable_field(Signal.REAR_DEFROST_ENABLED)
+        return self.stream.async_add_listener(
+            make_bool(Signal.REAR_DEFROST_ENABLED, callback),
+            {"vin":self.vin, "data": {Signal.REAR_DEFROST_ENABLED: None}}
+        )
+
+    def listen_ChargeRateMilePerHour(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
+        """Listen for Charge Rate Mile Per Hour."""
+        self._enable_field(Signal.CHARGE_RATE_MILE_PER_HOUR)
+        return self.stream.async_add_listener(
+            make_float(Signal.CHARGE_RATE_MILE_PER_HOUR, callback),
+            {"vin":self.vin, "data": {Signal.CHARGE_RATE_MILE_PER_HOUR: None}}
         )
 
 

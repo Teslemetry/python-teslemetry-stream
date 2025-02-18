@@ -227,6 +227,24 @@ class Signal(StrEnum):
     SETTING_CHARGE_UNIT = "SettingChargeUnit"
     CLIMATE_SEAT_COOLING_FRONT_LEFT = "ClimateSeatCoolingFrontLeft"
     CLIMATE_SEAT_COOLING_FRONT_RIGHT = "ClimateSeatCoolingFrontRight"
+    LIGHTS_HAZARDS_ACTIVE = "LightsHazardsActive"
+    LIGHTS_TURN_SIGNAL = "LightsTurnSignal"
+    LIGHTS_HIGH_BEAMS = "LightsHighBeams"
+    MEDIA_PLAYBACK_STATUS = "MediaPlaybackStatus"
+    MEDIA_PLAYBACK_SOURCE = "MediaPlaybackSource"
+    MEDIA_AUDIO_VOLUME = "MediaAudioVolume"
+    MEDIA_NOW_PLAYING_DURATION = "MediaNowPlayingDuration"
+    MEDIA_NOW_PLAYING_ELAPSED = "MediaNowPlayingElapsed"
+    MEDIA_NOW_PLAYING_ARTIST = "MediaNowPlayingArtist"
+    MEDIA_NOW_PLAYING_TITLE = "MediaNowPlayingTitle"
+    MEDIA_NOW_PLAYING_ALBUM = "MediaNowPlayingAlbum"
+    MEDIA_NOW_PLAYING_STATION = "MediaNowPlayingStation"
+    MEDIA_AUDIO_VOLUME_INCREMENT = "MediaAudioVolumeIncrement"
+    MEDIA_AUDIO_VOLUME_MAX = "MediaAudioVolumeMax"
+    SUNROOF_INSTALLED = "SunroofInstalled"
+    SEAT_VENT_ENABLED = "SeatVentEnabled"
+    REAR_DEFROST_ENABLED = "RearDefrostEnabled"
+    CHARGE_RATE_MILE_PER_HOUR = "ChargeRateMilePerHour"
 
 
 class Alert(StrEnum):
@@ -623,4 +641,26 @@ ChargeUnitPreference = TeslemetryEnum('ChargeUnit', [
     'Unknown',
     'Distance',
     'Percent'
+])
+
+SunroofInstalledState = TeslemetryEnum('SunroofInstalledState', [
+    'Unknown',
+    'NotInstalled',
+    'Gen1Installed',
+    'Gen2Installed'
+])
+
+TurnSignalState = TeslemetryEnum('TurnSignalState', [
+    'Unknown',
+    'Off',
+    'Left',
+    'Right',
+    'Both'
+])
+
+MediaStatus = TeslemetryEnum('MediaStatus', [
+    'Unknown',
+    'Stopped',
+    'Playing',
+    'Paused'
 ])
