@@ -88,24 +88,28 @@ You can also write your own listener that listens to multiple signals. Here is a
 ```python
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with TeslemetryStream(
+        stream = TeslemetryStream(
             access_token="<token>",
             vin="<vin>", # for single vehicles
             server="na.teslemetry.com" # or "eu.teslemetry.com"
             session=session,
-        ) as stream:
+        )
 
-            vehicle = stream.get_vehicle("<vin>")
+        await stream.connect()
 
-            def custom_listener(event):
-                if "BatteryLevel" in event["data"]:
-                    print(f"Battery Level: {event['data']['BatteryLevel']}")
-                if "VehicleSpeed" in event["data"]:
-                    print(f"Vehicle Speed: {event['data']['VehicleSpeed']}")
+        vehicle = stream.get_vehicle("<vin>")
 
-            remove_custom_listener = stream.async_add_listener(custom_listener, {"vin": "<vin>", "data": {"BatteryLevel": None, "VehicleSpeed": None}})
+        def custom_listener(event):
+            if "BatteryLevel" in event["data"]:
+                print(f"Battery Level: {event['data']['BatteryLevel']}")
+            if "VehicleSpeed" in event["data"]:
+                print(f"Vehicle Speed: {event['data']['VehicleSpeed']}")
 
-            print("Running")
-            await asyncio.sleep(60)
-            remove_custom_listener()
+        remove_custom_listener = stream.async_add_listener(custom_listener, {"vin": "<vin>", "data": {"BatteryLevel": None, "VehicleSpeed": None}})
+
+        print("Running")
+        await asyncio.sleep(60)
+        remove_custom_listener()
+
+        await stream.disconnect()
 ```
