@@ -111,5 +111,5 @@ async def main():
         await asyncio.sleep(60)
         remove_custom_listener()
 
-        await stream.disconnect()
+        await stream.close()
 ```
