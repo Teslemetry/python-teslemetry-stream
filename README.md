@@ -113,3 +113,115 @@ async def main():
 
         await stream.disconnect()
 ```
+
+## Public Methods in TeslemetryStream Class
+
+### `__init__(self, session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False)`
+Initialize the TeslemetryStream client.
+
+### `get_vehicle(self, vin: str) -> TeslemetryStreamVehicle`
+Create a vehicle stream.
+
+### `connected(self) -> bool`
+Return if connected.
+
+### `get_config(self, vin: str | None = None) -> None`
+Get the current stream config.
+
+### `find_server(self) -> None`
+Find the server using metadata.
+
+### `update_fields(self, fields: dict, vin: str) -> dict`
+Modify the Fleet Telemetry configuration.
+
+### `replace_fields(self, fields: dict, vin: str) -> dict`
+Replace the Fleet Telemetry configuration.
+
+### `config(self) -> dict`
+Return current configuration.
+
+### `connect(self) -> None`
+Connect to the telemetry stream.
+
+### `close(self) -> None`
+Close connection.
+
+### `async_add_listener(self, callback: Callable, filters: dict | None = None) -> Callable[[], None]`
+Add listener for data updates.
+
+### `listen(self)`
+Listen to the telemetry stream.
+
+### `listen_Credits(self, callback: Callable[[dict[str, str | int]], None]) -> Callable[[], None]`
+Add listener for credit events.
+
+### `listen_Balance(self, callback: Callable[[int], None]) -> Callable[[], None]`
+Add listener for credit balance.
+
+## Public Methods in TeslemetryStreamVehicle Class
+
+### `__init__(self, stream: TeslemetryStream, vin: str)`
+Initialize the TeslemetryStreamVehicle instance.
+
+### `get_config(self) -> None`
+Get the current vehicle config.
+
+### `update_fields(self, fields: dict) -> dict`
+Update Fleet Telemetry configuration for the vehicle.
+
+### `replace_fields(self, fields: dict) -> dict`
+Replace Fleet Telemetry configuration for the vehicle.
+
+### `config(self) -> dict`
+Return current configuration for the vehicle.
+
+### `listen_*` Methods
+The `TeslemetryStreamVehicle` class contains several `listen_*` methods for various telemetry signals. These methods allow you to listen to specific signals and handle their data in a type-safe manner. The available `listen_*` methods and their callback types are:
+
+- `listen_BatteryLevel(callback: Callable[[int], None])`
+- `listen_VehicleSpeed(callback: Callable[[int], None])`
+- `listen_Location(callback: Callable[[dict], None])`
+- `listen_ChargeState(callback: Callable[[str], None])`
+- `listen_DoorState(callback: Callable[[dict], None])`
+- `listen_HvacPower(callback: Callable[[str], None])`
+- `listen_ClimateKeeperMode(callback: Callable[[str], None])`
+- `listen_CabinOverheatProtectionMode(callback: Callable[[str], None])`
+- `listen_DefrostMode(callback: Callable[[str], None])`
+- `listen_SeatHeaterLeft(callback: Callable[[int], None])`
+- `listen_SeatHeaterRight(callback: Callable[[int], None])`
+- `listen_SeatHeaterRearLeft(callback: Callable[[int], None])`
+- `listen_SeatHeaterRearRight(callback: Callable[[int], None])`
+- `listen_SeatHeaterRearCenter(callback: Callable[[int], None])`
+- `listen_SentryMode(callback: Callable[[bool], None])`
+- `listen_ScheduledChargingMode(callback: Callable[[str], None])`
+- `listen_ScheduledChargingPending(callback: Callable[[bool], None])`
+- `listen_ScheduledChargingStartTime(callback: Callable[[str], None])`
+- `listen_ScheduledDepartureTime(callback: Callable[[str], None])`
+- `listen_SoftwareUpdateVersion(callback: Callable[[str], None])`
+- `listen_SoftwareUpdateDownloadPercentComplete(callback: Callable[[int], None])`
+- `listen_SoftwareUpdateExpectedDurationMinutes(callback: Callable[[int], None])`
+- `listen_SoftwareUpdateInstallationPercentComplete(callback: Callable[[int], None])`
+- `listen_SoftwareUpdateScheduledStartTime(callback: Callable[[str], None])`
+- `listen_ChargingCableType(callback: Callable[[str], None])`
+- `listen_FastChargerType(callback: Callable[[str], None])`
+- `listen_ChargePort(callback: Callable[[str], None])`
+- `listen_ChargePortLatch(callback: Callable[[str], None])`
+- `listen_ChargePortDoorOpen(callback: Callable[[bool], None])`
+- `listen_ChargeEnableRequest(callback: Callable[[bool], None])`
+- `listen_ChargeCurrentRequest(callback: Callable[[int], None])`
+- `listen_ChargeCurrentRequestMax(callback: Callable[[int], None])`
+- `listen_ChargeAmps(callback: Callable[[int], None])`
+- `listen_ChargerPhases(callback: Callable[[int], None])`
+- `listen_ChargeLimitSoc(callback: Callable[[int], None])`
+- `listen_ChargeState(callback: Callable[[str], None])`
+- `listen_ChargingCableType(callback: Callable[[str], None])`
+- `listen_FastChargerType(callback: Callable[[str], None])`
+- `listen_ChargePort(callback: Callable[[str], None])`
+- `listen_ChargePortLatch(callback: Callable[[str], None])`
+- `listen_ChargePortDoorOpen(callback: Callable[[bool], None])`
+- `listen_ChargeEnableRequest(callback: Callable[[bool], None])`
+- `listen_ChargeCurrentRequest(callback: Callable[[int], None])`
+- `listen_ChargeCurrentRequestMax(callback: Callable[[int], None])`
+- `listen_ChargeAmps(callback: Callable[[int], None])`
+- `listen_ChargerPhases(callback: Callable[[int], None])`
+- `listen_ChargeLimitSoc(callback: Callable[[int], None])`
