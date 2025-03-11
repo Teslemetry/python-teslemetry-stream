@@ -29,6 +29,15 @@ class TeslemetryStream:
         vin: str | None = None,
         parse_timestamp: bool = False,
     ):
+        """
+        Initialize the TeslemetryStream client.
+
+        :param session: An aiohttp ClientSession.
+        :param access_token: Access token for authentication.
+        :param server: Teslemetry server to connect to.
+        :param vin: Vehicle Identification Number.
+        :param parse_timestamp: Whether to parse timestamps.
+        """
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
 
@@ -44,7 +53,12 @@ class TeslemetryStream:
             self.vehicle = self.get_vehicle(self.vin)
 
     def get_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
-        """Create a vehicle stream."""
+        """
+        Create a vehicle stream.
+
+        :param vin: Vehicle Identification Number.
+        :return: TeslemetryStreamVehicle instance.
+        """
         if self.vin is not None and self.vin != vin:
             raise AttributeError("Stream started in single vehicle mode")
         if vin not in self.vehicles:
@@ -53,19 +67,28 @@ class TeslemetryStream:
 
     @property
     def connected(self) -> bool:
-        """Return if connected."""
+        """
+        Return if connected.
+
+        :return: True if connected, False otherwise.
+        """
         return self._response is not None
 
     async def get_config(self, vin: str | None = None) -> None:
-        """Get the current stream config."""
+        """
+        Get the current stream config.
+
+        :param vin: Vehicle Identification Number.
+        """
         if not self.server:
             await self.find_server()
         if hasattr(self, 'vehicle'):
             await self.vehicle.get_config()
 
     async def find_server(self) -> None:
-        """Find the server using metadata."""
-
+        """
+        Find the server using metadata.
+        """
         req = await self._session.get(
             "https://api.teslemetry.com/api/metadata",
             headers=self._headers,
@@ -74,10 +97,14 @@ class TeslemetryStream:
         response = await req.json()
         self.server = f"{response["region"].lower()}.teslemetry.com"
 
-
-
     async def update_fields(self, fields: dict, vin: str) -> dict:
-        """Update Fleet Telemetry configuration"""
+        """
+        Update Fleet Telemetry configuration.
+
+        :param fields: Dictionary of fields to update.
+        :param vin: Vehicle Identification Number.
+        :return: Response JSON as a dictionary.
+        """
         resp = await self._session.patch(
             f"https://api.teslemetry.com/api/config/{self.vin}",
             headers=self._headers,
@@ -89,7 +116,13 @@ class TeslemetryStream:
         return await resp.json()
 
     async def replace_fields(self, fields: dict, vin: str) -> dict:
-        """Replace Fleet Telemetry configuration"""
+        """
+        Replace Fleet Telemetry configuration.
+
+        :param fields: Dictionary of fields to replace.
+        :param vin: Vehicle Identification Number.
+        :return: Response JSON as a dictionary.
+        """
         resp = await self._session.post(
             f"https://api.teslemetry.com/api/config/{self.vin}",
             headers=self._headers,
@@ -102,13 +135,19 @@ class TeslemetryStream:
 
     @property
     def config(self) -> dict:
-        """Return current configuration."""
+        """
+        Return current configuration.
+
+        :return: Configuration dictionary.
+        """
         return {
             "hostname": self.server,
         }
 
     async def connect(self) -> None:
-        """Connect to the telemetry stream."""
+        """
+        Connect to the telemetry stream.
+        """
         self.active = True
         if not self.server:
             await self.get_config()
@@ -127,18 +166,30 @@ class TeslemetryStream:
         )
 
     def close(self) -> None:
-        """Close connection."""
+        """
+        Close connection.
+        """
         if self._response is not None:
             LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
 
     def __aiter__(self):
-        """Return"""
+        """
+        Return an asynchronous iterator.
+
+        :return: Asynchronous iterator.
+        """
         return self
 
     async def __anext__(self) -> dict:
-        """Return next event."""
+        """
+        Return next event.
+
+        :return: Next event as a dictionary.
+        :raises StopAsyncIteration: If the stream is stopped.
+        :raises TeslemetryStreamEnded: If the stream is ended by the server.
+        """
         try:
             if self.active is False:
                 # Stop the stream and loop
@@ -172,11 +223,19 @@ class TeslemetryStream:
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
     ) -> Callable[[], None]:
-        """Listen for data updates."""
+        """
+        Listen for data updates.
+
+        :param callback: Callback function to handle updates.
+        :param filters: Filters to apply to the updates.
+        :return: Function to remove the listener.
+        """
         schedule_refresh = not self._listeners
 
         def remove_listener() -> None:
-            """Remove update listener."""
+            """
+            Remove update listener.
+            """
             self._listeners.pop(remove_listener)
             if not self._listeners:
                 self.active = False
@@ -190,8 +249,9 @@ class TeslemetryStream:
         return remove_listener
 
     async def listen(self):
-        """Listen to the telemetry stream."""
-
+        """
+        Listen to the telemetry stream.
+        """
         async for event in self:
             if event:
                 for listener, filters in self._listeners.values():
@@ -203,23 +263,37 @@ class TeslemetryStream:
         LOGGER.debug("Listen has finished")
 
     def listen_Credits(self, callback: Callable[[dict[str, str | int]], None]) -> Callable[[], None]:
-        """Listen for credits update."""
+        """
+        Listen for credits update.
 
+        :param callback: Callback function to handle credits update.
+        :return: Function to remove the listener.
+        """
         return self.async_add_listener(
             lambda x: callback(x["credits"]),
             {"credits": None}
         )
 
     def listen_Balance(self, callback: Callable[[int], None]) -> Callable[[], None]:
-        """Listen for credits balance."""
+        """
+        Listen for credits balance.
 
+        :param callback: Callback function to handle credits balance.
+        :return: Function to remove the listener.
+        """
         return self.async_add_listener(
             lambda x: callback(x["credits"]["balance"]),
             {"credits": {"balance": None}}
         )
 
 def recursive_match(dict1, dict2):
-    """Recursively match dict1 with dict2."""
+    """
+    Recursively match dict1 with dict2.
+
+    :param dict1: First dictionary.
+    :param dict2: Second dictionary.
+    :return: True if dict1 matches dict2, False otherwise.
+    """
     if dict1 is not None:
         for key, value1 in dict1.items():
             if key not in dict2:
