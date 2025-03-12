@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any
 import aiohttp
 import asyncio
 import json
@@ -15,7 +16,7 @@ class TeslemetryStream:
     """Teslemetry Stream Client"""
 
     _response: aiohttp.ClientResponse | None = None
-    _listeners: dict[Callable, Callable]
+    _listeners: dict[Callable, tuple[Callable[[dict[str,Any]],None], dict | None]]
     delay: int
     active = None
     vehicle: TeslemetryStreamVehicle
@@ -198,6 +199,7 @@ class TeslemetryStream:
             if not self._response:
                 # Connect to the stream
                 await self.connect()
+            assert self._response
             async for line_in_bytes in self._response.content:
                 field, _, value = line_in_bytes.decode("utf8").partition(": ")
                 if field == "data":
@@ -219,6 +221,10 @@ class TeslemetryStream:
             LOGGER.debug("Reconnecting in %s seconds", self.delay)
             await asyncio.sleep(self.delay)
             self.delay += self.delay
+        except Exception as error:
+            LOGGER.error("Unexpected error: %s", error)
+            self.close()
+            LOGGER.debug("Reconnecting immediately")
 
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
@@ -238,6 +244,7 @@ class TeslemetryStream:
             """
             self._listeners.pop(remove_listener)
             if not self._listeners:
+                LOGGER.info("Shutting down stream as there are no more listeners")
                 self.active = False
 
         self._listeners[remove_listener] = (callback, filters)
