@@ -289,6 +289,30 @@ class TeslemetryEnum:
                 return option
         return default
 
+    def lower(self, value, default: str | None = None) -> str | None:
+        """Get the value if it is a valid option."""
+        if isinstance(value, str):
+            option = value.replace(self.prefix, "")
+            if option in self.options:
+                return option.lower()
+        return default
+
+    def lower_options(self) -> list[str]:
+        """Get all options in lower case."""
+        return [option.lower() for option in self.options]
+
+    def upper(self, value, default: str | None = None) -> str | None:
+        """Get the value if it is a valid option."""
+        if isinstance(value, str):
+            option = value.replace(self.prefix, "")
+            if option in self.options:
+                return option.upper()
+        return default
+
+    def upper_options(self) -> list[str]:
+        """Get all options in upper case."""
+        return [option.upper() for option in self.options]
+
 ChargeState = TeslemetryEnum("ChargeState",[
     'Unknown',
     'Disconnected',
