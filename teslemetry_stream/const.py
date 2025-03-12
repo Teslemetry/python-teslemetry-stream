@@ -217,7 +217,7 @@ class Signal(StrEnum):
     SPEED_LIMIT_MODE = "SpeedLimitMode"
     SPEED_LIMIT_WARNING = "SpeedLimitWarning"
     SUNROOF_INSTALLED = "SunroofInstalled"
-    SUPERCARGER_SESSION_TRIP_PLANNER = "SuperchargerSessionTripPlanner"
+    SUPERCHARGER_SESSION_TRIP_PLANNER = "SuperchargerSessionTripPlanner"
     TIME_TO_FULL_CHARGE = "TimeToFullCharge"
     TONNEAU_OPEN_PERCENT = "TonneauOpenPercent"
     TONNEAU_POSITION = "TonneauPosition"

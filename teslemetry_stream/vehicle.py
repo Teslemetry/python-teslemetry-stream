@@ -385,6 +385,14 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.CHARGE_PORT_LATCH: None}}
         )
 
+    def listen_ChargerVoltage(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
+        """Listen for Charger Voltage."""
+        self._enable_field(Signal.CHARGER_VOLTAGE)
+        return self.stream.async_add_listener(
+            make_float(Signal.CHARGER_VOLTAGE, callback),
+            {"vin":self.vin, "data": {Signal.CHARGER_VOLTAGE: None}}
+        )
+
     def listen_ChargeState(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
         """Listen for Charge State."""
         self._enable_field(Signal.CHARGE_STATE)
@@ -1479,6 +1487,14 @@ class TeslemetryStreamVehicle:
         return self.stream.async_add_listener(
             make_int(Signal.ROUTE_LAST_UPDATED, callback),
             {"vin":self.vin, "data": {Signal.ROUTE_LAST_UPDATED: None}}
+        )
+
+    def listen_RouteLine(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+        """Listen for Route Line."""
+        self._enable_field(Signal.ROUTE_LINE)
+        return self.stream.async_add_listener(
+            lambda x: callback(x['data'][Signal.ROUTE_LINE]),
+            {"vin":self.vin, "data": {Signal.ROUTE_LINE: None}}
         )
 
     def listen_RouteTrafficMinutesDelay(self, callback: Callable[[int | None], None]) -> Callable[[],None]:
