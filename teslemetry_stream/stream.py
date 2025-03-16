@@ -194,7 +194,6 @@ class TeslemetryStream:
         try:
             if self.active is False:
                 # Stop the stream and loop
-                self.close()
                 raise StopAsyncIteration
             if not self._response:
                 # Connect to the stream
@@ -215,6 +214,10 @@ class TeslemetryStream:
                     self.delay = DELAY
                     return data
             raise TeslemetryStreamEnded()
+        except StopAsyncIteration as e:
+            # Re-raise StopAsyncIteration explicitly to ensure it's not caught by the general Exception handler
+            self.close()
+            raise e
         except (TeslemetryStreamEnded, aiohttp.ClientError) as error:
             LOGGER.warning("Connection error: %s", repr(error))
             self.close()
