@@ -216,15 +216,16 @@ class TeslemetryStream:
                     return data
             raise TeslemetryStreamEnded()
         except (TeslemetryStreamEnded, aiohttp.ClientError) as error:
-            LOGGER.warning("Connection error: %s", error)
+            LOGGER.warning("Connection error: %s", repr(error))
             self.close()
             LOGGER.debug("Reconnecting in %s seconds", self.delay)
             await asyncio.sleep(self.delay)
             self.delay += self.delay
         except Exception as error:
-            LOGGER.error("Unexpected error: %s", error)
+            LOGGER.error("Unexpected error: %s", repr(error))
             self.close()
-            LOGGER.debug("Reconnecting immediately")
+            LOGGER.debug("Reconnecting in %s seconds", self.delay)
+            await asyncio.sleep(self.delay)
 
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
