@@ -16,11 +16,6 @@ class TeslemetryStream:
     """Teslemetry Stream Client"""
 
     _response: aiohttp.ClientResponse | None = None
-    _listeners: dict[Callable, tuple[Callable[[dict[str,Any]],None], dict | None]]
-    delay: int
-    active = None
-    vehicle: TeslemetryStreamVehicle
-    vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
     def __init__(
         self,
@@ -42,16 +37,20 @@ class TeslemetryStream:
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
 
+        self.active: bool = False
         self.server = server
         self.vin = vin
-        self._listeners = {}
+        self._listeners: dict[Callable, tuple[Callable[[dict[str,Any]],None], dict | None]] = {}
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
         self.parse_timestamp = parse_timestamp
-        self.delay = DELAY
+        self.delay: int = DELAY
+        self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
         if(self.vin):
-            self.vehicle = self.get_vehicle(self.vin)
+            self.vehicle: TeslemetryStreamVehicle = self.get_vehicle(self.vin)
+            self.vehicles[self.vin] = self.vehicle
+
 
     def get_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
         """
@@ -60,8 +59,6 @@ class TeslemetryStream:
         :param vin: Vehicle Identification Number.
         :return: TeslemetryStreamVehicle instance.
         """
-        if self.vin is not None and self.vin != vin:
-            raise AttributeError("Stream started in single vehicle mode")
         if vin not in self.vehicles:
             self.vehicles[vin] = TeslemetryStreamVehicle(self, vin)
         return self.vehicles[vin]
@@ -166,6 +163,13 @@ class TeslemetryStream:
             "Connected to %s with status %s", self._response.url, self._response.status
         )
 
+    async def disconnect(self) -> None:
+        """
+        Disconnect from the telemetry stream.
+        """
+        self.active = False
+        self.close()
+
     def close(self) -> None:
         """
         Close connection.
@@ -181,6 +185,8 @@ class TeslemetryStream:
 
         :return: Asynchronous iterator.
         """
+
+        self.active = True
         return self
 
     async def __anext__(self) -> dict:
