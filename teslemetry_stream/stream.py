@@ -24,6 +24,7 @@ class TeslemetryStream:
         server: str | None = None,
         vin: str | None = None,
         parse_timestamp: bool = False,
+        manual: bool = True,
     ):
         """
         Initialize the TeslemetryStream client.
@@ -33,6 +34,7 @@ class TeslemetryStream:
         :param server: Teslemetry server to connect to.
         :param vin: Vehicle Identification Number.
         :param parse_timestamp: Whether to parse timestamps.
+        :param manual: Whether to start listening manually.
         """
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
@@ -44,6 +46,7 @@ class TeslemetryStream:
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
         self.parse_timestamp = parse_timestamp
+        self.manual = manual
         self.delay: int = DELAY
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
@@ -260,7 +263,7 @@ class TeslemetryStream:
         self._listeners[remove_listener] = (callback, filters)
 
         # This is the first listener, set up task.
-        if schedule_refresh:
+        if schedule_refresh and not self.manual:
             asyncio.create_task(self.listen())
 
         return remove_listener
