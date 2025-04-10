@@ -24,7 +24,7 @@ class TeslemetryStream:
         server: str | None = None,
         vin: str | None = None,
         parse_timestamp: bool = False,
-        manual: bool = True,
+        manual: bool = False,
     ):
         """
         Initialize the TeslemetryStream client.
