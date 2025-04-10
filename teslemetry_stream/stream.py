@@ -21,7 +21,7 @@ class TeslemetryStream:
         self,
         session: aiohttp.ClientSession,
         access_token: str,
-        server: str | None = None,
+        server: str = "api.teslemetry.com",
         vin: str | None = None,
         parse_timestamp: bool = False,
         manual: bool = False,
