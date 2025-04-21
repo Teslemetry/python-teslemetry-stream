@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-
+from functools import cached_property
 
 class IntEnum(int, Enum):
     """Integer Enum"""
@@ -297,6 +297,12 @@ class TeslemetryEnum:
                 return option.lower()
         return default
 
+    @cached_property
+    def hass_options(self) -> list[str]:
+        """Get options in lower case excluding 'Unknown'."""
+        return [option.lower() for option in self.options if option != "Unknown"]
+
+    @cached_property
     def lower_options(self) -> list[str]:
         """Get all options in lower case."""
         return [option.lower() for option in self.options]
@@ -309,6 +315,7 @@ class TeslemetryEnum:
                 return option.upper()
         return default
 
+    @cached_property
     def upper_options(self) -> list[str]:
         """Get all options in upper case."""
         return [option.upper() for option in self.options]
