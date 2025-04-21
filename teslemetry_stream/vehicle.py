@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Callable
 
 from .const import (
@@ -28,6 +29,7 @@ from .const import (
     HvacPowerState,
     HvilStatus,
     LaneAssistLevel,
+    MediaStatus,
     PowershareState,
     PowershareStopReasonStatus,
     PowershareTypeStatus,
@@ -39,8 +41,8 @@ from .const import (
     SunroofInstalledState,
     TemperatureUnit,
     TeslaLocation,
+    TurnSignalState,
     WindowState,
-    MediaStatus
 )
 
 if TYPE_CHECKING:
@@ -1521,11 +1523,11 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.SCHEDULED_CHARGING_PENDING: None}}
         )
 
-    def listen_ScheduledChargingStartTime(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_ScheduledChargingStartTime(self, callback: Callable[[datetime | None], None]) -> Callable[[],None]:
         """Listen for Scheduled Charging Start Time."""
         self._enable_field(Signal.SCHEDULED_CHARGING_START_TIME)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SCHEDULED_CHARGING_START_TIME]),
+            make_datetime(Signal.SCHEDULED_CHARGING_START_TIME, callback),
             {"vin":self.vin, "data": {Signal.SCHEDULED_CHARGING_START_TIME: None}}
         )
 
@@ -1745,35 +1747,35 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.TPMS_HARD_WARNINGS: None}}
         )
 
-    def listen_TpmsLastSeenPressureTimeFl(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_TpmsLastSeenPressureTimeFl(self, callback: Callable[[datetime | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Front Left."""
         self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL]),
+            make_datetime(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL, callback),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FL: None}}
         )
 
-    def listen_TpmsLastSeenPressureTimeFr(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_TpmsLastSeenPressureTimeFr(self, callback: Callable[[datetime | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Front Right."""
         self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR]),
+            make_datetime(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR, callback),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_FR: None}}
         )
 
-    def listen_TpmsLastSeenPressureTimeRl(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_TpmsLastSeenPressureTimeRl(self, callback: Callable[[datetime | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Rear Left."""
         self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL]),
+            make_datetime(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL, callback),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RL: None}}
         )
 
-    def listen_TpmsLastSeenPressureTimeRr(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_TpmsLastSeenPressureTimeRr(self, callback: Callable[[datetime | None], None]) -> Callable[[],None]:
         """Listen for TPMS Last Seen Pressure Time Rear Right."""
         self._enable_field(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR]),
+            make_datetime(Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR, callback),
             {"vin":self.vin, "data": {Signal.TPMS_LAST_SEEN_PRESSURE_TIME_RR: None}}
         )
 
@@ -2065,6 +2067,18 @@ def make_location(signal: Signal, callback: Callable[[TeslaLocation | None], Non
             callback(TeslaLocation(latitude=data["latitude"], longitude=data["longitude"]))
         else:
             callback(None)
+    return typer
+
+def make_datetime(signal: Signal, callback: Callable[[datetime | None], None]) -> Callable[[dict], None]:
+    """Listener factory"""
+    def typer(event: dict):
+        data = event["data"][signal]
+        if isinstance(data, int):
+            try:
+                data = datetime.fromtimestamp(data, tz=timezone.utc)
+            except ValueError:
+                data = None
+        callback(data)
     return typer
 
 def merge(source, destination):
