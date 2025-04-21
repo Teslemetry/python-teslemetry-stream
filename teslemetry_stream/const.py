@@ -297,6 +297,14 @@ class TeslemetryEnum:
                 return option.lower()
         return default
 
+    def upper(self, value, default: str | None = None) -> str | None:
+        """Get the value if it is a valid option."""
+        if isinstance(value, str):
+            option = value.replace(self.prefix, "")
+            if option in self.options:
+                return option.upper()
+        return default
+
     @cached_property
     def hass_options(self) -> list[str]:
         """Get options in lower case excluding 'Unknown'."""
@@ -306,14 +314,6 @@ class TeslemetryEnum:
     def lower_options(self) -> list[str]:
         """Get all options in lower case."""
         return [option.lower() for option in self.options]
-
-    def upper(self, value, default: str | None = None) -> str | None:
-        """Get the value if it is a valid option."""
-        if isinstance(value, str):
-            option = value.replace(self.prefix, "")
-            if option in self.options:
-                return option.upper()
-        return default
 
     @cached_property
     def upper_options(self) -> list[str]:
