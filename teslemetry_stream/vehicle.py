@@ -1169,14 +1169,6 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.LIFETIME_ENERGY_USED: None}}
         )
 
-    def listen_LifetimeEnergyUsedDrive(self, callback: Callable[[float | None], None]) -> Callable[[],None]:
-        """Listen for Lifetime Energy Used Drive."""
-        self._enable_field(Signal.LIFETIME_ENERGY_USED_DRIVE)
-        return self.stream.async_add_listener(
-            make_float(Signal.LIFETIME_ENERGY_USED_DRIVE, callback),
-            {"vin":self.vin, "data": {Signal.LIFETIME_ENERGY_USED_DRIVE: None}}
-        )
-
     def listen_LocatedAtFavorite(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Located At Favorite."""
         self._enable_field(Signal.LOCATED_AT_FAVORITE)
@@ -1257,11 +1249,11 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.MODULE_TEMP_MIN: None}}
         )
 
-    def listen_NotEnoughPowerToHeat(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_NotEnoughPowerToHeat(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Not Enough Power to Heat."""
         self._enable_field(Signal.NOT_ENOUGH_POWER_TO_HEAT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.NOT_ENOUGH_POWER_TO_HEAT]),
+            make_bool(Signal.NOT_ENOUGH_POWER_TO_HEAT, callback),
             {"vin":self.vin, "data": {Signal.NOT_ENOUGH_POWER_TO_HEAT: None}}
         )
 
