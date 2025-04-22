@@ -18,7 +18,8 @@ The TeslemetryStream class requires:
 - session: an aiohttp.ClientSession
 - access_token: an access token from the [Teslemetry console](https://teslemetry.com/console)
 - vin: If you only want to use a single vehicle, otherwise use `create_vehicle`
-- server: The Teslemetry server to connect to, otherwise use `find_server`
+- server: Override the Teslemetry server to connect to:
+  - api.teslemetry.com (recommended and default)
   - na.teslemetry.com
   - eu.teslemetry.com
 
@@ -60,7 +61,6 @@ async def main():
         async with TeslemetryStream(
             access_token="<token>",
             vin="<vin>", # for single vehicles
-            server="na.teslemetry.com" # or "eu.teslemetry.com"
             session=session,
         ) as stream:
 
@@ -175,6 +175,25 @@ Replace Fleet Telemetry configuration for the vehicle.
 ### `config(self) -> dict`
 Return current configuration for the vehicle.
 
+### `listen_State(callback: Callable[[bool], None]) -> Callable[[],None]`
+Listen for vehicle online state polling. The callback receives a boolean value representing whether the vehicle is online.
+
+### `listen_VehicleData(callback: Callable[[dict], None]) -> Callable[[],None]`
+Listen for vehicle data polling events. The callback receives a dictionary containing the complete vehicle data.
+
+### `listen_Cellular(callback: Callable[[bool], None]) -> Callable[[],None]`
+Listen for cellular connectivity events. The callback receives a boolean value indicating whether the cellular connection is established.
+
+### `listen_Wifi(callback: Callable[[bool], None]) -> Callable[[],None]`
+Listen for WiFi connectivity events. The callback receives a boolean value indicating whether the WiFi connection is established.
+
+### `listen_Alerts(callback: Callable[[list[dict]], None]) -> Callable[[],None]`
+Listen for vehicle alert events. The callback receives a list of dictionaries containing alert information.
+
+### `listen_Errors(callback: Callable[[list[dict]], None]) -> Callable[[],None]`
+Listen for vehicle error events. The callback receives a list of dictionaries containing error information.
+
 ### `listen_*` Methods
 The `TeslemetryStreamVehicle` class contains a `listen_*` methods for each telemetry signal.
 These methods allow you to listen to specific signals and handle their data in a type-safe manner.
+A full list of fields and metadata can be found at [api.teslemetry.com/fields.json](https://api.teslemetry.com/fields.json)

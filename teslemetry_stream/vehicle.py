@@ -28,6 +28,7 @@ from .const import (
     HvacAutoModeState,
     HvacPowerState,
     HvilStatus,
+    Key,
     LaneAssistLevel,
     MediaStatus,
     PowershareState,
@@ -38,6 +39,9 @@ from .const import (
     SentryModeState,
     ShiftState,
     Signal,
+    State,
+    Status,
+    NetworkInterface,
     SunroofInstalledState,
     TemperatureUnit,
     TeslaLocation,
@@ -161,6 +165,49 @@ class TeslemetryStreamVehicle:
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""
         asyncio.create_task(self.add_field(field))
+
+    # Add listeners for other streaming fields
+    def listen_State(self, callback: Callable[[bool], None]) -> Callable[[],None]:
+        """Listen for State polling."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.STATE] == State.ONLINE),
+            {Key.VIN: self.vin, Key.STATE: None}
+        )
+
+    def listen_VehicleData(self, callback: Callable[[dict], None]) -> Callable[[],None]:
+        """Listen for Vehicle Data polling."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.VEHICLE_DATA]),
+            {Key.VIN: self.vin, Key.VEHICLE_DATA: None}
+        )
+
+    def listen_Cellular(self, callback: Callable[[bool], None]) -> Callable[[],None]:
+        """Listen for Cellular connectivity."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.STATUS] == Status.CONNECTED),
+            {Key.VIN: self.vin, Key.NETWORK_INTERFACE: NetworkInterface.CELLULAR}
+        )
+
+    def listen_Wifi(self, callback: Callable[[bool], None]) -> Callable[[],None]:
+        """Listen for WiFi connectivity."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.STATUS] == Status.CONNECTED),
+            {Key.VIN: self.vin, Key.NETWORK_INTERFACE: NetworkInterface.WIFI}
+        )
+
+    def listen_Alerts(self, callback: Callable[[list[dict]], None]) -> Callable[[],None]:
+        """Listen for Alerts."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.ALERTS]),
+            {Key.VIN: self.vin, Key.ALERTS: None}
+        )
+
+    def listen_Errors(self, callback: Callable[[list[dict]], None]) -> Callable[[],None]:
+        """Listen for Errors."""
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.ERRORS]),
+            {Key.VIN: self.vin, Key.ERRORS: None}
+        )
 
     # Add listeners for each signal
     def listen_ACChargingEnergyIn(self, callback: Callable[[float | None], None]) -> Callable[[],None]:

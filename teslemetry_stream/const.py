@@ -10,6 +10,17 @@ class StrEnum(str, Enum):
     """String Enum"""
 
 
+class Key(StrEnum):
+    """Topics available in Fleet Telemetry streams"""
+    VIN = "vin"
+    DATA = "data"
+    ALERTS = "alerts"
+    ERRORS = "errors"
+    VEHICLE_DATA = "vehicle_data"
+    STATE = "state"
+    STATUS = "status"
+    NETWORK_INTERFACE = "networkInterface"
+
 class Signal(StrEnum):
     """Signals available in Fleet Telemetry streams"""
 
@@ -248,6 +259,24 @@ class Alert(StrEnum):
     SERVICE = "Service"
     SERVICE_FIX = "ServiceFix"
 
+class State(StrEnum):
+    """States available in Fleet Telemetry streams"""
+
+    ONLINE = "online"
+    OFFLINE = "offline"
+    ASLEEP = "asleep"
+
+class NetworkInterface(StrEnum):
+    """Network interfaces available in Fleet Telemetry streams"""
+
+    WIFI = "wifi"
+    CELLULAR = "cellular"
+
+class Status(StrEnum):
+    """Statuses available in Fleet Telemetry streams"""
+
+    CONNECTED = "CONNECTED"
+    DISCONNECTED = "DISCONNECTED"
 
 @dataclass
 class TeslaLocation:
