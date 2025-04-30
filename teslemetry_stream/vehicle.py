@@ -39,12 +39,15 @@ from .const import (
     SentryModeState,
     ShiftState,
     Signal,
+    SpeedAssistLevel,
     State,
     Status,
     NetworkInterface,
     SunroofInstalledState,
     TemperatureUnit,
     TeslaLocation,
+    TonneauPositionState,
+    TonneauTentModeState,
     TurnSignalState,
     WindowState,
 )
@@ -1742,7 +1745,7 @@ class TeslemetryStreamVehicle:
         """Listen for Speed Limit Warning."""
         self._enable_field(Signal.SPEED_LIMIT_WARNING)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.SPEED_LIMIT_WARNING]),
+            lambda x: callback(SpeedAssistLevel.get(x['data'][Signal.SPEED_LIMIT_WARNING])),
             {"vin":self.vin, "data": {Signal.SPEED_LIMIT_WARNING: None}}
         )
 
@@ -1774,7 +1777,7 @@ class TeslemetryStreamVehicle:
         """Listen for Tonneau Position."""
         self._enable_field(Signal.TONNEAU_POSITION)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TONNEAU_POSITION]),
+            lambda x: callback(TonneauPositionState.get(x['data'][Signal.TONNEAU_POSITION])),
             {"vin":self.vin, "data": {Signal.TONNEAU_POSITION: None}}
         )
 
@@ -1782,7 +1785,7 @@ class TeslemetryStreamVehicle:
         """Listen for Tonneau Tent Mode."""
         self._enable_field(Signal.TONNEAU_TENT_MODE)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.TONNEAU_TENT_MODE]),
+            lambda x: callback(TonneauTentModeState.get(x['data'][Signal.TONNEAU_TENT_MODE])),
             {"vin":self.vin, "data": {Signal.TONNEAU_TENT_MODE: None}}
         )
 

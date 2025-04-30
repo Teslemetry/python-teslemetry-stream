@@ -465,6 +465,7 @@ BMSState = TeslemetryEnum('BMSState', [
     'SNA'
 ])
 
+# Unused
 BuckleStatus = TeslemetryEnum('BuckleStatus', [
     'Unknown',
     'Unlatched',
