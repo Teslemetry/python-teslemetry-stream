@@ -154,8 +154,11 @@ class TeslemetryStream:
             await self.get_config()
 
         LOGGER.debug("Connecting to %s", self.server)
+        url = f"https://{self.server}/sse"
+        if self.vin:
+            url += f"/{self.vin}"
         self._response = await self._session.get(
-            f"https://{self.server}/sse/{self.vin or ''}",
+            url,
             headers=self._headers,
             raise_for_status=True,
             timeout=aiohttp.ClientTimeout(
