@@ -350,13 +350,14 @@ class TeslemetryEnum:
         return [option.upper() for option in self.options]
 
 ChargeState = TeslemetryEnum("ChargeState",[
-    'Unknown',
-    'Disconnected',
-    'NoPower',
-    'Starting',
-    'Charging',
-    'Complete',
-    'Stopped'
+    'Idle',
+    'ClearFaults',
+    'Enable',
+    'QualifyLineConfig',
+    'Shutdown',
+    'Startup',
+    'SystemConfig',
+    'WaitForLineVoltage'
 ])
 
 DetailedChargeState = TeslemetryEnum('DetailedChargeState',[
