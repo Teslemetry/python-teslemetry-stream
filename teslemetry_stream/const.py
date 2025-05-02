@@ -349,6 +349,8 @@ class TeslemetryEnum:
         """Get all options in upper case."""
         return [option.upper() for option in self.options]
 
+# This isnt a real Enum, and doesnt match the proto.
+# Tesla has deprecated this field
 ChargeState = TeslemetryEnum("ChargeState",[
     'Idle',
     'ClearFaults',
