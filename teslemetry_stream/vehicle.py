@@ -1397,11 +1397,11 @@ class TeslemetryStreamVehicle:
             {"vin":self.vin, "data": {Signal.PAIRED_PHONE_KEY_AND_KEY_FOB_QTY: None}}
         )
 
-    def listen_PassengerSeatBelt(self, callback: Callable[[str | None], None]) -> Callable[[],None]:
+    def listen_PassengerSeatBelt(self, callback: Callable[[bool | None], None]) -> Callable[[],None]:
         """Listen for Passenger Seat Belt."""
         self._enable_field(Signal.PASSENGER_SEAT_BELT)
         return self.stream.async_add_listener(
-            lambda x: callback(x['data'][Signal.PASSENGER_SEAT_BELT]),
+            make_bool(Signal.PASSENGER_SEAT_BELT, callback),
             {"vin":self.vin, "data": {Signal.PASSENGER_SEAT_BELT: None}}
         )
 
