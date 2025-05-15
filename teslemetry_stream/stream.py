@@ -164,6 +164,7 @@ class TeslemetryStream:
             timeout=aiohttp.ClientTimeout(
                 connect=5, sock_connect=5, sock_read=30, total=None
             ),
+            chunked=True
         )
         LOGGER.debug(
             "Connected to %s with status %s", self._response.url, self._response.status
