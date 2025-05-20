@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from .vehicle import TeslemetryStreamVehicle
 from .exception import TeslemetryStreamEnded
 
-DELAY = 1
 LOGGER = logging.getLogger(__package__)
 
 class TeslemetryStream:
@@ -43,11 +42,12 @@ class TeslemetryStream:
         self.server = server
         self.vin = vin
         self._listeners: dict[Callable, tuple[Callable[[dict[str,Any]],None], dict | None]] = {}
+        self._connection_listeners: dict[Callable, Callable[[bool],None]] = {}
         self._session = session
         self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
         self.parse_timestamp = parse_timestamp
         self.manual = manual
-        self.delay: int = DELAY
+        self.retries: int = 0
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
         if(self.vin):
@@ -145,6 +145,30 @@ class TeslemetryStream:
             "hostname": self.server,
         }
 
+    def async_add_connection_listener(
+        self, callback: Callable[[bool], None]
+    ) -> Callable[[], None]:
+        """
+        Listen for connection state changes.
+
+        :param callback: Callback function to handle connection state changes.
+        :return: Function to remove the listener.
+        """
+        def remove_listener() -> None:
+            """
+            Remove connection listener.
+            """
+            self._connection_listeners.pop(remove_listener)
+
+        self._connection_listeners[remove_listener] = callback
+
+        return remove_listener
+
+    def _update_connection_listeners(self, value: bool | None = None):
+        """Update all connection listeners with retry count"""
+        for listener in self._connection_listeners.values():
+            listener(self.connected if value is None else value)
+
     async def connect(self) -> None:
         """
         Connect to the telemetry stream.
@@ -169,8 +193,10 @@ class TeslemetryStream:
         LOGGER.debug(
             "Connected to %s with status %s", self._response.url, self._response.status
         )
+        self.retries = 0
+        self._update_connection_listeners(True)
 
-    async def disconnect(self) -> None:
+    def disconnect(self) -> None:
         """
         Disconnect from the telemetry stream.
         """
@@ -185,6 +211,7 @@ class TeslemetryStream:
             LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
+        self._update_connection_listeners(False)
 
     def __aiter__(self):
         """
@@ -223,25 +250,28 @@ class TeslemetryStream:
                             .replace(tzinfo=timezone.utc)
                             .timestamp()
                         ) * 1000 + int(ns[:3])
-                    # LOGGER.debug("event %s", json.dumps(data))
-                    self.delay = DELAY
                     return data
             raise TeslemetryStreamEnded()
         except StopAsyncIteration as e:
             # Re-raise StopAsyncIteration explicitly to ensure it's not caught by the general Exception handler
-            self.close()
+            self.disconnect()
             raise e
-        except (TeslemetryStreamEnded, aiohttp.ClientError) as error:
-            LOGGER.warning("Connection error: %s", repr(error))
+        except TeslemetryStreamEnded:
+            LOGGER.warning("Stream ended by server")
             self.close()
-            LOGGER.debug("Reconnecting in %s seconds", self.delay)
-            await asyncio.sleep(self.delay)
-            self.delay += self.delay
+        except aiohttp.ClientError as error:
+            LOGGER.warning("Client error: %s", repr(error))
+            self.close()
+            delay = min(2 ** self.retries, 600)
+            LOGGER.debug("Reconnecting in %s seconds", delay)
+            await asyncio.sleep(delay)
+            self.retries += 1
         except Exception as error:
             LOGGER.error("Unexpected error: %s", repr(error))
             self.close()
-            LOGGER.debug("Reconnecting in %s seconds", self.delay)
-            await asyncio.sleep(self.delay)
+            LOGGER.debug("Reconnecting in %s seconds", 1)
+            await asyncio.sleep(1)
+
 
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
