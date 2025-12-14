@@ -84,9 +84,10 @@ class TeslemetryStreamVehicle:
     async def get_config(self) -> None:
         """Get the current configuration for the vehicle."""
 
+        headers = await self.stream.headers()
         req = await self.stream._session.get(
             f"https://api.teslemetry.com/api/config/{self.vin}",
-            headers=self.stream._headers,
+            headers=headers,
             raise_for_status=False,
         )
         if req.status == 200:
@@ -133,9 +134,10 @@ class TeslemetryStreamVehicle:
 
     async def patch_config(self, config: dict) -> dict[str, str | dict]:
         """Modify the configuration for the vehicle."""
+        headers = await self.stream.headers()
         resp = await self.stream._session.patch(
             f"https://api.teslemetry.com/api/config/{self.vin}",
-            headers=self.stream._headers,
+            headers=headers,
             json=config,
             raise_for_status=False,
         )
@@ -143,9 +145,10 @@ class TeslemetryStreamVehicle:
 
     async def post_config(self, config: dict) -> dict[str, str | dict]:
         """Overwrite the configuration for the vehicle."""
+        headers = await self.stream.headers()
         resp = await self.stream._session.post(
             f"https://api.teslemetry.com/api/config/{self.vin}",
-            headers=self.stream._headers,
+            headers=headers,
             json=config,
             raise_for_status=False,
         )

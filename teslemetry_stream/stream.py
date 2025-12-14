@@ -1,15 +1,16 @@
-from collections.abc import Callable
-from typing import Any
-import aiohttp
 import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable
 
-from .vehicle import TeslemetryStreamVehicle
+import aiohttp
+
 from .exception import TeslemetryStreamEnded
+from .vehicle import TeslemetryStreamVehicle
 
 LOGGER = logging.getLogger(__package__)
+
 
 class TeslemetryStream:
     """Teslemetry Stream Client"""
@@ -19,7 +20,7 @@ class TeslemetryStream:
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        access_token: str,
+        access_token: str | Callable[[], Awaitable[str]],
         server: str = "api.teslemetry.com",
         vin: str | None = None,
         parse_timestamp: bool = False,
@@ -41,19 +42,30 @@ class TeslemetryStream:
         self.active: bool = False
         self.server = server
         self.vin = vin
-        self._listeners: dict[Callable, tuple[Callable[[dict[str,Any]],None], dict | None]] = {}
-        self._connection_listeners: dict[Callable, Callable[[bool],None]] = {}
+        self._listeners: dict[
+            Callable, tuple[Callable[[dict[str, Any]], None], dict | None]
+        ] = {}
+        self._connection_listeners: dict[Callable, Callable[[bool], None]] = {}
         self._session = session
-        self._headers = {"Authorization": f"Bearer {access_token}", "X-Library": "python teslemetry-stream"}
+        self.access_token = access_token
         self.parse_timestamp = parse_timestamp
         self.manual = manual
         self.retries: int = 0
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
 
-        if(self.vin):
+        if self.vin:
             self.vehicle: TeslemetryStreamVehicle = self.get_vehicle(self.vin)
             self.vehicles[self.vin] = self.vehicle
 
+    async def headers(self) -> dict[str, str]:
+        if callable(self.access_token):
+            access_token = await self.access_token()
+        else:
+            access_token = self.access_token
+        return {
+            "Authorization": f"Bearer {access_token}",
+            "X-Library": "python teslemetry-stream",
+        }
 
     def get_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
         """
@@ -83,20 +95,21 @@ class TeslemetryStream:
         """
         if not self.server:
             await self.find_server()
-        if hasattr(self, 'vehicle'):
+        if hasattr(self, "vehicle"):
             await self.vehicle.get_config()
 
     async def find_server(self) -> None:
         """
         Find the server using metadata.
         """
+        headers = await self.headers()
         req = await self._session.get(
             "https://api.teslemetry.com/api/metadata",
-            headers=self._headers,
+            headers=headers,
             raise_for_status=True,
         )
         response = await req.json()
-        self.server = f"{response["region"].lower()}.teslemetry.com"
+        self.server = f"{response['region'].lower()}.teslemetry.com"
 
     async def update_fields(self, fields: dict, vin: str) -> dict:
         """
@@ -106,9 +119,10 @@ class TeslemetryStream:
         :param vin: Vehicle Identification Number.
         :return: Response JSON as a dictionary.
         """
+        headers = await self.headers()
         resp = await self._session.patch(
             f"https://api.teslemetry.com/api/config/{self.vin}",
-            headers=self._headers,
+            headers=headers,
             json={"fields": fields},
             raise_for_status=False,
         )
@@ -124,9 +138,10 @@ class TeslemetryStream:
         :param vin: Vehicle Identification Number.
         :return: Response JSON as a dictionary.
         """
+        headers = await self.headers()
         resp = await self._session.post(
             f"https://api.teslemetry.com/api/config/{self.vin}",
-            headers=self._headers,
+            headers=headers,
             json={"fields": fields},
             raise_for_status=False,
         )
@@ -154,6 +169,7 @@ class TeslemetryStream:
         :param callback: Callback function to handle connection state changes.
         :return: Function to remove the listener.
         """
+
         def remove_listener() -> None:
             """
             Remove connection listener.
@@ -181,14 +197,15 @@ class TeslemetryStream:
         url = f"https://{self.server}/sse"
         if self.vin:
             url += f"/{self.vin}"
+        headers = await self.headers()
         self._response = await self._session.get(
             url,
-            headers=self._headers,
+            headers=headers,
             raise_for_status=True,
             timeout=aiohttp.ClientTimeout(
                 connect=5, sock_connect=5, sock_read=30, total=None
             ),
-            chunked=True
+            chunked=True,
         )
         LOGGER.debug(
             "Connected to %s with status %s", self._response.url, self._response.status
@@ -223,7 +240,7 @@ class TeslemetryStream:
         self.active = True
         return self
 
-    async def __anext__(self) -> dict:
+    async def __anext__(self) -> dict[str, Any]:
         """
         Return next event.
 
@@ -262,7 +279,7 @@ class TeslemetryStream:
         except aiohttp.ClientError as error:
             LOGGER.warning("Client error: %s", repr(error))
             self.close()
-            delay = min(2 ** self.retries, 600)
+            delay = min(2**self.retries, 600)
             LOGGER.debug("Reconnecting in %s seconds", delay)
             await asyncio.sleep(delay)
             self.retries += 1
@@ -271,7 +288,6 @@ class TeslemetryStream:
             self.close()
             LOGGER.debug("Reconnecting in %s seconds", 1)
             await asyncio.sleep(1)
-
 
     def async_add_listener(
         self, callback: Callable, filters: dict | None = None
@@ -316,7 +332,9 @@ class TeslemetryStream:
                             LOGGER.error("Uncaught error in listener: %s", error)
         LOGGER.debug("Listen has finished")
 
-    def listen_Credits(self, callback: Callable[[dict[str, str | int]], None]) -> Callable[[], None]:
+    def listen_Credits(
+        self, callback: Callable[[dict[str, str | int]], None]
+    ) -> Callable[[], None]:
         """
         Listen for credits update.
 
@@ -324,8 +342,7 @@ class TeslemetryStream:
         :return: Function to remove the listener.
         """
         return self.async_add_listener(
-            lambda x: callback(x["credits"]),
-            {"credits": None}
+            lambda x: callback(x["credits"]), {"credits": None}
         )
 
     def listen_Balance(self, callback: Callable[[int], None]) -> Callable[[], None]:
@@ -336,9 +353,9 @@ class TeslemetryStream:
         :return: Function to remove the listener.
         """
         return self.async_add_listener(
-            lambda x: callback(x["credits"]["balance"]),
-            {"credits": {"balance": None}}
+            lambda x: callback(x["credits"]["balance"]), {"credits": {"balance": None}}
         )
+
 
 def recursive_match(dict1, dict2):
     """
