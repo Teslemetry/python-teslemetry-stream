@@ -31,6 +31,7 @@ from .const import (
     Key,
     LaneAssistLevel,
     MediaStatus,
+    NetworkInterface,
     PowershareState,
     PowershareStopReasonStatus,
     PowershareTypeStatus,
@@ -42,7 +43,6 @@ from .const import (
     SpeedAssistLevel,
     State,
     Status,
-    NetworkInterface,
     SunroofInstalledState,
     TemperatureUnit,
     TeslaLocation,
@@ -1526,6 +1526,26 @@ class TeslemetryStreamVehicle:
             {"vin": self.vin, "data": {Signal.LIFETIME_ENERGY_USED: None}},
         )
 
+    def listen_LifetimeEnergyGainedRegen(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Lifetime Energy Gained from Regeneration."""
+        self._enable_field(Signal.LIFETIME_ENERGY_GAINED_REGEN)
+        return self.stream.async_add_listener(
+            make_float(Signal.LIFETIME_ENERGY_GAINED_REGEN, callback),
+            {"vin": self.vin, "data": {Signal.LIFETIME_ENERGY_GAINED_REGEN: None}},
+        )
+
+    def listen_LifetimeEnergyUsedDrive(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Lifetime Energy Used for Driving."""
+        self._enable_field(Signal.LIFETIME_ENERGY_USED_DRIVE)
+        return self.stream.async_add_listener(
+            make_float(Signal.LIFETIME_ENERGY_USED_DRIVE, callback),
+            {"vin": self.vin, "data": {Signal.LIFETIME_ENERGY_USED_DRIVE: None}},
+        )
+
     def listen_LocatedAtFavorite(
         self, callback: Callable[[bool | None], None]
     ) -> Callable[[], None]:
@@ -1584,6 +1604,16 @@ class TeslemetryStreamVehicle:
         return self.stream.async_add_listener(
             make_float(Signal.LONGITUDINAL_ACCELERATION, callback),
             {"vin": self.vin, "data": {Signal.LONGITUDINAL_ACCELERATION: None}},
+        )
+
+    def listen_MilesSinceReset(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Miles Since Reset."""
+        self._enable_field(Signal.MILES_SINCE_RESET)
+        return self.stream.async_add_listener(
+            make_float(Signal.MILES_SINCE_RESET, callback),
+            {"vin": self.vin, "data": {Signal.MILES_SINCE_RESET: None}},
         )
 
     def listen_MilesToArrival(
@@ -2602,6 +2632,135 @@ class TeslemetryStreamVehicle:
         return self.stream.async_add_listener(
             make_bool(Signal.SEAT_VENT_ENABLED, callback),
             {"vin": self.vin, "data": {Signal.SEAT_VENT_ENABLED: None}},
+        )
+
+    def listen_SelfDrivingMilesSinceReset(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Self Driving Miles Since Reset."""
+        self._enable_field(Signal.SELF_DRIVING_MILES_SINCE_RESET)
+        return self.stream.async_add_listener(
+            make_float(Signal.SELF_DRIVING_MILES_SINCE_RESET, callback),
+            {"vin": self.vin, "data": {Signal.SELF_DRIVING_MILES_SINCE_RESET: None}},
+        )
+
+    def listen_SemitruckPassengerSeatFoldPosition(
+        self, callback: Callable[[int | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck Passenger Seat Fold Position."""
+        self._enable_field(Signal.SEMITRUCK_PASSENGER_SEAT_FOLD_POSITION)
+        return self.stream.async_add_listener(
+            make_int(Signal.SEMITRUCK_PASSENGER_SEAT_FOLD_POSITION, callback),
+            {
+                "vin": self.vin,
+                "data": {Signal.SEMITRUCK_PASSENGER_SEAT_FOLD_POSITION: None},
+            },
+        )
+
+    def listen_SemitruckTpmsPressureRe1L0(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 1 Left 0."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE1L0)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE1L0, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE1L0: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe1L1(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 1 Left 1."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE1L1)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE1L1, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE1L1: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe1R0(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 1 Right 0."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE1R0)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE1R0, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE1R0: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe1R1(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 1 Right 1."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE1R1)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE1R1, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE1R1: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe2L0(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 2 Left 0."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE2L0)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE2L0, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE2L0: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe2L1(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 2 Left 1."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE2L1)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE2L1, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE2L1: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe2R0(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 2 Right 0."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE2R0)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE2R0, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE2R0: None}},
+        )
+
+    def listen_SemitruckTpmsPressureRe2R1(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck TPMS Pressure Rear Axle 2 Right 1."""
+        self._enable_field(Signal.SEMITRUCK_TPMS_PRESSURE_RE2R1)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMITRUCK_TPMS_PRESSURE_RE2R1, callback),
+            {"vin": self.vin, "data": {Signal.SEMITRUCK_TPMS_PRESSURE_RE2R1: None}},
+        )
+
+    def listen_SemitruckTractorParkBrakeStatus(
+        self, callback: Callable[[dict | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck Tractor Park Brake Status."""
+        self._enable_field(Signal.SEMITRUCK_TRACTOR_PARK_BRAKE_STATUS)
+        return self.stream.async_add_listener(
+            make_dict(Signal.SEMITRUCK_TRACTOR_PARK_BRAKE_STATUS, callback),
+            {
+                "vin": self.vin,
+                "data": {Signal.SEMITRUCK_TRACTOR_PARK_BRAKE_STATUS: None},
+            },
+        )
+
+    def listen_SemitruckTrailerParkBrakeStatus(
+        self, callback: Callable[[dict | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semitruck Trailer Park Brake Status."""
+        self._enable_field(Signal.SEMITRUCK_TRAILER_PARK_BRAKE_STATUS)
+        return self.stream.async_add_listener(
+            make_dict(Signal.SEMITRUCK_TRAILER_PARK_BRAKE_STATUS, callback),
+            {
+                "vin": self.vin,
+                "data": {Signal.SEMITRUCK_TRAILER_PARK_BRAKE_STATUS: None},
+            },
         )
 
     def listen_RearDefrostEnabled(

@@ -1,6 +1,7 @@
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
+
 
 class IntEnum(int, Enum):
     """Integer Enum"""
@@ -12,6 +13,7 @@ class StrEnum(str, Enum):
 
 class Key(StrEnum):
     """Topics available in Fleet Telemetry streams"""
+
     VIN = "vin"
     DATA = "data"
     ALERTS = "alerts"
@@ -20,6 +22,7 @@ class Key(StrEnum):
     STATE = "state"
     STATUS = "status"
     NETWORK_INTERFACE = "networkInterface"
+
 
 class Signal(StrEnum):
     """Signals available in Fleet Telemetry streams"""
@@ -40,7 +43,9 @@ class Signal(StrEnum):
     BRICK_VOLTAGE_MAX = "BrickVoltageMax"
     BRICK_VOLTAGE_MIN = "BrickVoltageMin"
     CABIN_OVERHEAT_PROTECTION_MODE = "CabinOverheatProtectionMode"
-    CABIN_OVERHEAT_PROTECTION_TEMPERATURE_LIMIT = "CabinOverheatProtectionTemperatureLimit"
+    CABIN_OVERHEAT_PROTECTION_TEMPERATURE_LIMIT = (
+        "CabinOverheatProtectionTemperatureLimit"
+    )
     CAR_TYPE = "CarType"
     CENTER_DISPLAY = "CenterDisplay"
     CHARGE_AMPS = "ChargeAmps"
@@ -144,7 +149,9 @@ class Signal(StrEnum):
     ISOLATION_RESISTANCE = "IsolationResistance"
     LANE_DEPARTURE_AVOIDANCE = "LaneDepartureAvoidance"
     LATERAL_ACCELERATION = "LateralAcceleration"
+    LIFETIME_ENERGY_GAINED_REGEN = "LifetimeEnergyGainedRegen"
     LIFETIME_ENERGY_USED = "LifetimeEnergyUsed"
+    LIFETIME_ENERGY_USED_DRIVE = "LifetimeEnergyUsedDrive"
     LIGHTS_HAZARDS_ACTIVE = "LightsHazardsActive"
     LIGHTS_HIGH_BEAMS = "LightsHighBeams"
     LIGHTS_TURN_SIGNAL = "LightsTurnSignal"
@@ -212,6 +219,18 @@ class Signal(StrEnum):
     SEAT_HEATER_REAR_RIGHT = "SeatHeaterRearRight"
     SEAT_HEATER_RIGHT = "SeatHeaterRight"
     SEAT_VENT_ENABLED = "SeatVentEnabled"
+    SELF_DRIVING_MILES_SINCE_RESET = "SelfDrivingMilesSinceReset"
+    SEMITRUCK_PASSENGER_SEAT_FOLD_POSITION = "SemitruckPassengerSeatFoldPosition"
+    SEMITRUCK_TPMS_PRESSURE_RE1L0 = "SemitruckTpmsPressureRe1L0"
+    SEMITRUCK_TPMS_PRESSURE_RE1L1 = "SemitruckTpmsPressureRe1L1"
+    SEMITRUCK_TPMS_PRESSURE_RE1R0 = "SemitruckTpmsPressureRe1R0"
+    SEMITRUCK_TPMS_PRESSURE_RE1R1 = "SemitruckTpmsPressureRe1R1"
+    SEMITRUCK_TPMS_PRESSURE_RE2L0 = "SemitruckTpmsPressureRe2L0"
+    SEMITRUCK_TPMS_PRESSURE_RE2L1 = "SemitruckTpmsPressureRe2L1"
+    SEMITRUCK_TPMS_PRESSURE_RE2R0 = "SemitruckTpmsPressureRe2R0"
+    SEMITRUCK_TPMS_PRESSURE_RE2R1 = "SemitruckTpmsPressureRe2R1"
+    SEMITRUCK_TRACTOR_PARK_BRAKE_STATUS = "SemitruckTractorParkBrakeStatus"
+    SEMITRUCK_TRAILER_PARK_BRAKE_STATUS = "SemitruckTrailerParkBrakeStatus"
     SENTRY_MODE = "SentryMode"
     SERVICE_MODE = "ServiceMode"
     SETTING_24_HOUR_TIME = "Setting24HourTime"
@@ -222,7 +241,9 @@ class Signal(StrEnum):
     SOC = "Soc"
     SOFTWARE_UPDATE_DOWNLOAD_PERCENT_COMPLETE = "SoftwareUpdateDownloadPercentComplete"
     SOFTWARE_UPDATE_EXPECTED_DURATION_MINUTES = "SoftwareUpdateExpectedDurationMinutes"
-    SOFTWARE_UPDATE_INSTALLATION_PERCENT_COMPLETE = "SoftwareUpdateInstallationPercentComplete"
+    SOFTWARE_UPDATE_INSTALLATION_PERCENT_COMPLETE = (
+        "SoftwareUpdateInstallationPercentComplete"
+    )
     SOFTWARE_UPDATE_SCHEDULED_START_TIME = "SoftwareUpdateScheduledStartTime"
     SOFTWARE_UPDATE_VERSION = "SoftwareUpdateVersion"
     SPEED_LIMIT_MODE = "SpeedLimitMode"
@@ -250,6 +271,7 @@ class Signal(StrEnum):
     VERSION = "Version"
     WHEEL_TYPE = "WheelType"
     WIPER_HEAT_ENABLED = "WiperHeatEnabled"
+    MILES_SINCE_RESET = "MilesSinceReset"
 
 
 class Alert(StrEnum):
@@ -259,6 +281,7 @@ class Alert(StrEnum):
     SERVICE = "Service"
     SERVICE_FIX = "ServiceFix"
 
+
 class State(StrEnum):
     """States available in Fleet Telemetry streams"""
 
@@ -266,11 +289,13 @@ class State(StrEnum):
     OFFLINE = "offline"
     ASLEEP = "asleep"
 
+
 class NetworkInterface(StrEnum):
     """Network interfaces available in Fleet Telemetry streams"""
 
     WIFI = "wifi"
     CELLULAR = "cellular"
+
 
 class Status(StrEnum):
     """Statuses available in Fleet Telemetry streams"""
@@ -278,12 +303,14 @@ class Status(StrEnum):
     CONNECTED = "CONNECTED"
     DISCONNECTED = "DISCONNECTED"
 
+
 @dataclass
 class TeslaLocation:
     """Location data"""
 
     latitude: float
     longitude: float
+
 
 @dataclass
 class TeslaDoors:
@@ -349,376 +376,280 @@ class TeslemetryEnum:
         """Get all options in upper case."""
         return [option.upper() for option in self.options]
 
+
 # This isnt a real Enum, and doesnt match the proto.
 # Tesla has deprecated this field
-ChargeState = TeslemetryEnum("ChargeState",[
-    'Idle',
-    'ClearFaults',
-    'Enable',
-    'QualifyLineConfig',
-    'Shutdown',
-    'Startup',
-    'SystemConfig',
-    'WaitForLineVoltage'
-])
+ChargeState = TeslemetryEnum(
+    "ChargeState",
+    [
+        "Idle",
+        "ClearFaults",
+        "Enable",
+        "QualifyLineConfig",
+        "Shutdown",
+        "Startup",
+        "SystemConfig",
+        "WaitForLineVoltage",
+    ],
+)
 
-DetailedChargeState = TeslemetryEnum('DetailedChargeState',[
-    'Unknown',
-    'Disconnected',
-    'NoPower',
-    'Starting',
-    'Charging',
-    'Complete',
-    'Stopped'
-])
+DetailedChargeState = TeslemetryEnum(
+    "DetailedChargeState",
+    [
+        "Unknown",
+        "Disconnected",
+        "NoPower",
+        "Starting",
+        "Charging",
+        "Complete",
+        "Stopped",
+    ],
+)
 
-ShiftState = TeslemetryEnum('ShiftState', [
-    'Unknown',
-    'Invalid',
-    'P',
-    'R',
-    'N',
-    'D',
-    'SNA'
-])
+ShiftState = TeslemetryEnum(
+    "ShiftState", ["Unknown", "Invalid", "P", "R", "N", "D", "SNA"]
+)
 
-FollowDistance = TeslemetryEnum('FollowDistance', [
-    'Unknown',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7'
-])
+FollowDistance = TeslemetryEnum(
+    "FollowDistance", ["Unknown", "1", "2", "3", "4", "5", "6", "7"]
+)
 
-ForwardCollisionSensitivity = TeslemetryEnum('ForwardCollisionSensitivity', [
-    'Unknown',
-    'Off',
-    'Late',
-    'Average',
-    'Early'
-])
+ForwardCollisionSensitivity = TeslemetryEnum(
+    "ForwardCollisionSensitivity", ["Unknown", "Off", "Late", "Average", "Early"]
+)
 
-GuestModeMobileAccess = TeslemetryEnum('GuestModeMobileAccess', [
-    'Unknown',
-    'Init',
-    'NotAuthenticated',
-    'Authenticated',
-    'AbortedDriving',
-    'AbortedUsingRemoteStart',
-    'AbortedUsingBLEKeys',
-    'AbortedValetMode',
-    'AbortedGuestModeOff',
-    'AbortedDriveAuthTimeExceeded',
-    'AbortedNoDataReceived',
-    'RequestingFromMothership',
-    'RequestingFromAuthD',
-    'AbortedFetchFailed',
-    'AbortedBadDataReceived',
-    'ShowingQRCode',
-    'SwipedAway',
-    'DismissedQRCodeExpired',
-    'SucceededPairedNewBLEKey'
-])
+GuestModeMobileAccess = TeslemetryEnum(
+    "GuestModeMobileAccess",
+    [
+        "Unknown",
+        "Init",
+        "NotAuthenticated",
+        "Authenticated",
+        "AbortedDriving",
+        "AbortedUsingRemoteStart",
+        "AbortedUsingBLEKeys",
+        "AbortedValetMode",
+        "AbortedGuestModeOff",
+        "AbortedDriveAuthTimeExceeded",
+        "AbortedNoDataReceived",
+        "RequestingFromMothership",
+        "RequestingFromAuthD",
+        "AbortedFetchFailed",
+        "AbortedBadDataReceived",
+        "ShowingQRCode",
+        "SwipedAway",
+        "DismissedQRCodeExpired",
+        "SucceededPairedNewBLEKey",
+    ],
+)
 
-LaneAssistLevel = TeslemetryEnum('LaneAssistLevel', [
-    'Unknown',
-    'None',
-    'Warning',
-    'Assist'
-])
+LaneAssistLevel = TeslemetryEnum(
+    "LaneAssistLevel", ["Unknown", "None", "Warning", "Assist"]
+)
 
-ScheduledChargingMode = TeslemetryEnum('ScheduledChargingMode', [
-    'Unknown',
-    'Off',
-    'StartAt',
-    'DepartBy'
-])
+ScheduledChargingMode = TeslemetryEnum(
+    "ScheduledChargingMode", ["Unknown", "Off", "StartAt", "DepartBy"]
+)
 
-SentryModeState = TeslemetryEnum('SentryModeState', [
-    'Unknown',
-    'Off',
-    'Idle',
-    'Armed',
-    'Aware',
-    'Panic',
-    'Quiet'
-])
+SentryModeState = TeslemetryEnum(
+    "SentryModeState", ["Unknown", "Off", "Idle", "Armed", "Aware", "Panic", "Quiet"]
+)
 
-SpeedAssistLevel = TeslemetryEnum('SpeedAssistLevel', [
-    'Unknown',
-    'None',
-    'Display',
-    'Chime'
-])
+SpeedAssistLevel = TeslemetryEnum(
+    "SpeedAssistLevel", ["Unknown", "None", "Display", "Chime"]
+)
 
-BMSState = TeslemetryEnum('BMSState', [
-    'Unknown',
-    'Standby',
-    'Drive',
-    'Support',
-    'Charge',
-    'FEIM',
-    'ClearFault',
-    'Fault',
-    'Weld',
-    'Test',
-    'SNA'
-])
+BMSState = TeslemetryEnum(
+    "BMSState",
+    [
+        "Unknown",
+        "Standby",
+        "Drive",
+        "Support",
+        "Charge",
+        "FEIM",
+        "ClearFault",
+        "Fault",
+        "Weld",
+        "Test",
+        "SNA",
+    ],
+)
 
 # Unused
-BuckleStatus = TeslemetryEnum('BuckleStatus', [
-    'Unknown',
-    'Unlatched',
-    'Latched',
-    'Faulted'
-])
+BuckleStatus = TeslemetryEnum(
+    "BuckleStatus", ["Unknown", "Unlatched", "Latched", "Faulted"]
+)
 
-CarType = TeslemetryEnum('CarType', [
-    'Unknown',
-    'ModelS',
-    'ModelX',
-    'Model3',
-    'ModelY',
-    'SemiTruck',
-    'Cybertruck'
-])
+CarType = TeslemetryEnum(
+    "CarType",
+    ["Unknown", "ModelS", "ModelX", "Model3", "ModelY", "SemiTruck", "Cybertruck"],
+)
 
-ChargePort = TeslemetryEnum('ChargePort', [
-    'Unknown',
-    'US',
-    'EU',
-    'GB',
-    'CCS'
-])
+ChargePort = TeslemetryEnum("ChargePort", ["Unknown", "US", "EU", "GB", "CCS"])
 
-ChargePortLatch = TeslemetryEnum('ChargePortLatch', [
-    'Unknown',
-    'SNA',
-    'Disengaged',
-    'Engaged',
-    'Blocking'
-])
+ChargePortLatch = TeslemetryEnum(
+    "ChargePortLatch", ["Unknown", "SNA", "Disengaged", "Engaged", "Blocking"]
+)
 
-DriveInverterState = TeslemetryEnum('DriveInverterState', [
-    'Unknown',
-    'Unavailable',
-    'Standby',
-    'Fault',
-    'Abort',
-    'Enable'
-])
+DriveInverterState = TeslemetryEnum(
+    "DriveInverterState",
+    ["Unknown", "Unavailable", "Standby", "Fault", "Abort", "Enable"],
+)
 
-HvilStatus = TeslemetryEnum('HvilStatus', [
-    'Unknown',
-    'Fault',
-    'OK'
-])
+HvilStatus = TeslemetryEnum("HvilStatus", ["Unknown", "Fault", "OK"])
 
-WindowState = TeslemetryEnum('WindowState', [
-    'Unknown',
-    'Closed',
-    'PartiallyOpen',
-    'Opened'
-])
+WindowState = TeslemetryEnum(
+    "WindowState", ["Unknown", "Closed", "PartiallyOpen", "Opened"]
+)
 
-SeatFoldPosition = TeslemetryEnum('SeatFoldPosition', [
-    'Unknown',
-    'SNA',
-    'Faulted',
-    'NotConfigured',
-    'Folded',
-    'Unfolded'
-])
+SeatFoldPosition = TeslemetryEnum(
+    "SeatFoldPosition",
+    ["Unknown", "SNA", "Faulted", "NotConfigured", "Folded", "Unfolded"],
+)
 
-TractorAirStatus = TeslemetryEnum('TractorAirStatus', [
-    'Unknown',
-    'NotAvailable',
-    'Error',
-    'Charged',
-    'BuildingPressureIntermediate',
-    'ExhaustingPressureIntermediate',
-    'Exhausted'
-])
+TractorAirStatus = TeslemetryEnum(
+    "TractorAirStatus",
+    [
+        "Unknown",
+        "NotAvailable",
+        "Error",
+        "Charged",
+        "BuildingPressureIntermediate",
+        "ExhaustingPressureIntermediate",
+        "Exhausted",
+    ],
+)
 
-TrailerAirStatus = TeslemetryEnum('TrailerAirStatus', [
-    'Unknown',
-    'SNA',
-    'Invalid',
-    'BobtailMode',
-    'Charged',
-    'BuildingPressureIntermediate',
-    'ExhaustingPressureIntermediate',
-    'Exhausted'
-])
+TrailerAirStatus = TeslemetryEnum(
+    "TrailerAirStatus",
+    [
+        "Unknown",
+        "SNA",
+        "Invalid",
+        "BobtailMode",
+        "Charged",
+        "BuildingPressureIntermediate",
+        "ExhaustingPressureIntermediate",
+        "Exhausted",
+    ],
+)
 
-HvacAutoModeState = TeslemetryEnum('HvacAutoModeState', [
-    'Unknown',
-    'On',
-    'Override'
-])
+HvacAutoModeState = TeslemetryEnum("HvacAutoModeState", ["Unknown", "On", "Override"])
 
-CabinOverheatProtectionModeState = TeslemetryEnum('CabinOverheatProtectionModeState', [
-    'Unknown',
-    'Off',
-    'On',
-    'FanOnly'
-])
+CabinOverheatProtectionModeState = TeslemetryEnum(
+    "CabinOverheatProtectionModeState", ["Unknown", "Off", "On", "FanOnly"]
+)
 
-ClimateOverheatProtectionTempLimit = TeslemetryEnum('ClimateOverheatProtectionTempLimit', [
-    'Unknown',
-    'High',
-    'Medium',
-    'Low'
-])
+ClimateOverheatProtectionTempLimit = TeslemetryEnum(
+    "ClimateOverheatProtectionTempLimit", ["Unknown", "High", "Medium", "Low"]
+)
 
-DefrostModeState = TeslemetryEnum('DefrostModeState', [
-    'Unknown',
-    'Off',
-    'Normal',
-    'Max',
-    'AutoDefog'
-])
+DefrostModeState = TeslemetryEnum(
+    "DefrostModeState", ["Unknown", "Off", "Normal", "Max", "AutoDefog"]
+)
 
-ClimateKeeperModeState = TeslemetryEnum('ClimateKeeperModeState', [
-    'Unknown',
-    'Off',
-    'On',
-    'Dog',
-    'Party'
-])
+ClimateKeeperModeState = TeslemetryEnum(
+    "ClimateKeeperModeState", ["Unknown", "Off", "On", "Dog", "Party"]
+)
 
-HvacPowerState = TeslemetryEnum('HvacPowerState', [
-    'Unknown',
-    'Off',
-    'On',
-    'Precondition',
-    'OverheatProtect'
-])
+HvacPowerState = TeslemetryEnum(
+    "HvacPowerState", ["Unknown", "Off", "On", "Precondition", "OverheatProtect"]
+)
 
-FastCharger = TeslemetryEnum('FastCharger', [
-    'Unknown',
-    'Supercharger',
-    'CHAdeMO',
-    'GB',
-    'ACSingleWireCAN',
-    'Combo',
-    'MCSingleWireCAN',
-    'Other',
-    'SNA'
-])
+FastCharger = TeslemetryEnum(
+    "FastCharger",
+    [
+        "Unknown",
+        "Supercharger",
+        "CHAdeMO",
+        "GB",
+        "ACSingleWireCAN",
+        "Combo",
+        "MCSingleWireCAN",
+        "Other",
+        "SNA",
+    ],
+)
 
-CableType = TeslemetryEnum('CableType', [
-    'Unknown',
-    'IEC',
-    'SAE',
-    'GB_AC',
-    'GB_DC',
-    'SNA'
-])
+CableType = TeslemetryEnum(
+    "CableType", ["Unknown", "IEC", "SAE", "GB_AC", "GB_DC", "SNA"]
+)
 
-TonneauTentModeState = TeslemetryEnum('TonneauTentModeState', [
-    'Unknown',
-    'Inactive',
-    'Moving',
-    'Failed',
-    'Active'
-])
+TonneauTentModeState = TeslemetryEnum(
+    "TonneauTentModeState", ["Unknown", "Inactive", "Moving", "Failed", "Active"]
+)
 
-TonneauPositionState = TeslemetryEnum('TonneauPositionState', [
-    'Unknown',
-    'Invalid',
-    'Closed',
-    'PartiallyOpen',
-    'FullyOpen'
-])
+TonneauPositionState = TeslemetryEnum(
+    "TonneauPositionState",
+    ["Unknown", "Invalid", "Closed", "PartiallyOpen", "FullyOpen"],
+)
 
-PowershareState = TeslemetryEnum('PowershareState', [
-    'Unknown',
-    'Inactive',
-    'Handshaking',
-    'Init',
-    'Enabled',
-    'EnabledReconnectingSoon',
-    'Stopped'
-])
+PowershareState = TeslemetryEnum(
+    "PowershareState",
+    [
+        "Unknown",
+        "Inactive",
+        "Handshaking",
+        "Init",
+        "Enabled",
+        "EnabledReconnectingSoon",
+        "Stopped",
+    ],
+)
 
-PowershareStopReasonStatus = TeslemetryEnum('PowershareStopReasonStatus', [
-    'Unknown',
-    'None',
-    'SOCTooLow',
-    'Retry',
-    'Fault',
-    'User',
-    'Reconnecting',
-    'Authentication'
-])
+PowershareStopReasonStatus = TeslemetryEnum(
+    "PowershareStopReasonStatus",
+    [
+        "Unknown",
+        "None",
+        "SOCTooLow",
+        "Retry",
+        "Fault",
+        "User",
+        "Reconnecting",
+        "Authentication",
+    ],
+)
 
-PowershareTypeStatus = TeslemetryEnum('PowershareTypeStatus', [
-    'Unknown',
-    'None',
-    'Load',
-    'Home'
-])
+PowershareTypeStatus = TeslemetryEnum(
+    "PowershareTypeStatus", ["Unknown", "None", "Load", "Home"]
+)
 
-DisplayState = TeslemetryEnum('DisplayState', [
-    'Unknown',
-    'Off',
-    'Dim',
-    'Accessory',
-    'On',
-    'Driving',
-    'Charging',
-    'Lock',
-    'Sentry',
-    'Dog',
-    'Entertainment'
-])
+DisplayState = TeslemetryEnum(
+    "DisplayState",
+    [
+        "Unknown",
+        "Off",
+        "Dim",
+        "Accessory",
+        "On",
+        "Driving",
+        "Charging",
+        "Lock",
+        "Sentry",
+        "Dog",
+        "Entertainment",
+    ],
+)
 
-DistanceUnit = TeslemetryEnum('DistanceUnit', [
-    'Unknown',
-    'Miles',
-    'Kilometers'
-])
+DistanceUnit = TeslemetryEnum("DistanceUnit", ["Unknown", "Miles", "Kilometers"])
 
-TemperatureUnit = TeslemetryEnum('TemperatureUnit', [
-    'Unknown',
-    'Fahrenheit',
-    'Celsius'
-])
+TemperatureUnit = TeslemetryEnum(
+    "TemperatureUnit", ["Unknown", "Fahrenheit", "Celsius"]
+)
 
-PressureUnit = TeslemetryEnum('PressureUnit', [
-    'Unknown',
-    'Psi',
-    'Bar'
-])
+PressureUnit = TeslemetryEnum("PressureUnit", ["Unknown", "Psi", "Bar"])
 
-ChargeUnitPreference = TeslemetryEnum('ChargeUnit', [
-    'Unknown',
-    'Distance',
-    'Percent'
-])
+ChargeUnitPreference = TeslemetryEnum("ChargeUnit", ["Unknown", "Distance", "Percent"])
 
-SunroofInstalledState = TeslemetryEnum('SunroofInstalledState', [
-    'Unknown',
-    'NotInstalled',
-    'Gen1Installed',
-    'Gen2Installed'
-])
+SunroofInstalledState = TeslemetryEnum(
+    "SunroofInstalledState",
+    ["Unknown", "NotInstalled", "Gen1Installed", "Gen2Installed"],
+)
 
-TurnSignalState = TeslemetryEnum('TurnSignalState', [
-    'Unknown',
-    'Off',
-    'Left',
-    'Right',
-    'Both'
-])
+TurnSignalState = TeslemetryEnum(
+    "TurnSignalState", ["Unknown", "Off", "Left", "Right", "Both"]
+)
 
-MediaStatus = TeslemetryEnum('MediaStatus', [
-    'Unknown',
-    'Stopped',
-    'Playing',
-    'Paused'
-])
+MediaStatus = TeslemetryEnum("MediaStatus", ["Unknown", "Stopped", "Playing", "Paused"])
