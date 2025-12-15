@@ -20,7 +20,7 @@ class TeslemetryStream:
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        access_token: str | Callable[[], Awaitable[str]],
+        access_token: str | Callable[[], Awaitable[str | None]],
         server: str = "api.teslemetry.com",
         vin: str | None = None,
         parse_timestamp: bool = False,
