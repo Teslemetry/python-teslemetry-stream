@@ -612,7 +612,7 @@ wheels = [
 
 [[package]]
 name = "teslemetry-stream"
-version = "0.7.10"
+version = "0.8.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

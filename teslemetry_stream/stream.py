@@ -1,8 +1,9 @@
+from __future__ import annotations
 import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, cast
 
 import aiohttp
 
@@ -43,15 +44,16 @@ class TeslemetryStream:
         self.server = server
         self.vin = vin
         self._listeners: dict[
-            Callable, tuple[Callable[[dict[str, Any]], None], dict | None]
+            Callable[..., Any], tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None]
         ] = {}
-        self._connection_listeners: dict[Callable, Callable[[bool], None]] = {}
+        self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
         self._session = session
         self.access_token = access_token
         self.parse_timestamp = parse_timestamp
         self.manual = manual
         self.retries: int = 0
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
+        self.fields: dict[str, Any] = {}
 
         if self.vin:
             self.vehicle: TeslemetryStreamVehicle = self.get_vehicle(self.vin)
@@ -111,7 +113,7 @@ class TeslemetryStream:
         response = await req.json()
         self.server = f"{response['region'].lower()}.teslemetry.com"
 
-    async def update_fields(self, fields: dict, vin: str) -> dict:
+    async def update_fields(self, fields: dict[str, Any], vin: str) -> dict[str, Any]:
         """
         Update Fleet Telemetry configuration.
 
@@ -128,9 +130,9 @@ class TeslemetryStream:
         )
         if resp.ok:
             self.fields = {**self.fields, **fields}
-        return await resp.json()
+        return cast(dict[str, Any], await resp.json())
 
-    async def replace_fields(self, fields: dict, vin: str) -> dict:
+    async def replace_fields(self, fields: dict[str, Any], vin: str) -> dict[str, Any]:
         """
         Replace Fleet Telemetry configuration.
 
@@ -147,10 +149,10 @@ class TeslemetryStream:
         )
         if resp.ok:
             self.fields = fields
-        return await resp.json()
+        return cast(dict[str, Any], await resp.json())
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         """
         Return current configuration.
 
@@ -180,7 +182,7 @@ class TeslemetryStream:
 
         return remove_listener
 
-    def _update_connection_listeners(self, value: bool | None = None):
+    def _update_connection_listeners(self, value: bool | None = None) -> None:
         """Update all connection listeners with retry count"""
         for listener in self._connection_listeners.values():
             listener(self.connected if value is None else value)
@@ -230,7 +232,7 @@ class TeslemetryStream:
             self._response = None
         self._update_connection_listeners(False)
 
-    def __aiter__(self):
+    def __aiter__(self) -> TeslemetryStream:
         """
         Return an asynchronous iterator.
 
@@ -248,49 +250,49 @@ class TeslemetryStream:
         :raises StopAsyncIteration: If the stream is stopped.
         :raises TeslemetryStreamEnded: If the stream is ended by the server.
         """
-        try:
-            if self.active is False:
-                # Stop the stream and loop
-                raise StopAsyncIteration
-            if not self._response:
-                # Connect to the stream
-                await self.connect()
-            assert self._response
-            async for line_in_bytes in self._response.content:
-                field, _, value = line_in_bytes.decode("utf8").partition(": ")
-                if field == "data":
-                    data = json.loads(value)
-                    if self.parse_timestamp:
-                        main, _, ns = data["createdAt"].partition(".")
-                        data["timestamp"] = int(
-                            datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
-                            .replace(tzinfo=timezone.utc)
-                            .timestamp()
-                        ) * 1000 + int(ns[:3])
-                    return data
-            raise TeslemetryStreamEnded()
-        except StopAsyncIteration as e:
-            # Re-raise StopAsyncIteration explicitly to ensure it's not caught by the general Exception handler
-            self.disconnect()
-            raise e
-        except TeslemetryStreamEnded:
-            LOGGER.warning("Stream ended by server")
-            self.close()
-        except aiohttp.ClientError as error:
-            LOGGER.warning("Client error: %s", repr(error))
-            self.close()
-            delay = min(2**self.retries, 600)
-            LOGGER.debug("Reconnecting in %s seconds", delay)
-            await asyncio.sleep(delay)
-            self.retries += 1
-        except Exception as error:
-            LOGGER.error("Unexpected error: %s", repr(error))
-            self.close()
-            LOGGER.debug("Reconnecting in %s seconds", 1)
-            await asyncio.sleep(1)
+        while self.active:
+            try:
+                if not self._response:
+                    # Connect to the stream
+                    await self.connect()
+                assert self._response
+                async for line_in_bytes in self._response.content:
+                    field, _, value = line_in_bytes.decode("utf8").partition(": ")
+                    if field == "data":
+                        data = json.loads(value)
+                        if self.parse_timestamp:
+                            main, _, ns = data["createdAt"].partition(".")
+                            data["timestamp"] = int(
+                                datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
+                                .replace(tzinfo=timezone.utc)
+                                .timestamp()
+                            ) * 1000 + int(ns[:3])
+                        return cast(dict[str, Any], data)
+                raise TeslemetryStreamEnded()
+            except StopAsyncIteration as e:
+                # Re-raise StopAsyncIteration explicitly to ensure it's not caught by the general Exception handler
+                self.disconnect()
+                raise e
+            except TeslemetryStreamEnded:
+                LOGGER.warning("Stream ended by server")
+                self.close()
+            except aiohttp.ClientError as error:
+                LOGGER.warning("Client error: %s", repr(error))
+                self.close()
+                delay = min(2**self.retries, 600)
+                LOGGER.debug("Reconnecting in %s seconds", delay)
+                await asyncio.sleep(delay)
+                self.retries += 1
+            except Exception as error:
+                LOGGER.error("Unexpected error: %s", repr(error))
+                self.close()
+                LOGGER.debug("Reconnecting in %s seconds", 1)
+                await asyncio.sleep(1)
+
+        raise StopAsyncIteration
 
     def async_add_listener(
-        self, callback: Callable, filters: dict | None = None
+        self, callback: Callable[[dict[str, Any]], None], filters: dict[str, Any] | None = None
     ) -> Callable[[], None]:
         """
         Listen for data updates.
@@ -318,7 +320,7 @@ class TeslemetryStream:
 
         return remove_listener
 
-    async def listen(self):
+    async def listen(self) -> None:
         """
         Listen to the telemetry stream.
         """
@@ -357,7 +359,7 @@ class TeslemetryStream:
         )
 
 
-def recursive_match(dict1, dict2):
+def recursive_match(dict1: dict[str, Any] | None, dict2: dict[str, Any]) -> bool:
     """
     Recursively match dict1 with dict2.
 

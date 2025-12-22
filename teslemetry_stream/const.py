@@ -1,6 +1,8 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
+from typing import Any
 
 
 class IntEnum(int, Enum):
@@ -337,7 +339,7 @@ class TeslemetryEnum:
         self.options = options
         self.values = [f"{prefix}{option}" for option in options]
 
-    def get(self, value, default: str | None = None) -> str | None:
+    def get(self, value: Any, default: str | None = None) -> str | None:
         """Get the value if it is a valid option."""
         if isinstance(value, str):
             option = value.replace(self.prefix, "")
@@ -345,7 +347,7 @@ class TeslemetryEnum:
                 return option
         return default
 
-    def lower(self, value, default: str | None = None) -> str | None:
+    def lower(self, value: Any, default: str | None = None) -> str | None:
         """Get the value if it is a valid option."""
         if isinstance(value, str):
             option = value.replace(self.prefix, "")
@@ -353,7 +355,7 @@ class TeslemetryEnum:
                 return option.lower()
         return default
 
-    def upper(self, value, default: str | None = None) -> str | None:
+    def upper(self, value: Any, default: str | None = None) -> str | None:
         """Get the value if it is a valid option."""
         if isinstance(value, str):
             option = value.replace(self.prefix, "")

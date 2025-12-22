@@ -1,9 +1,10 @@
 """Vehicle class for handling streaming field updates."""
 
+from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from .const import (
     BMSState,
@@ -63,9 +64,9 @@ LOGGER = logging.getLogger(__package__)
 class TeslemetryStreamVehicle:
     """Handle streaming field updates."""
 
-    fields: dict[Signal, dict[str, int]] = {}
+    fields: dict[str, dict[str, int]] = {}
     preferTyped: bool | None = None
-    _config: dict = {}
+    _config: dict[str, Any] = {}
 
     def __init__(self, stream: TeslemetryStream, vin: str):
         # A dictionary of TelemetryField keys and null values
@@ -74,7 +75,7 @@ class TeslemetryStreamVehicle:
         self.lock = asyncio.Lock()
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         """Return current configuration."""
         return {
             "fields": self.fields,
@@ -101,7 +102,7 @@ class TeslemetryStreamVehicle:
 
         req.raise_for_status()
 
-    async def update_config(self, config: dict) -> None:
+    async def update_config(self, config: dict[str, Any]) -> None:
         """Update the configuration for the vehicle."""
 
         # Lock so that we dont change the config while making the API call
@@ -132,7 +133,7 @@ class TeslemetryStreamVehicle:
                     self.preferTyped = prefer_typed
                 self._config.clear()
 
-    async def patch_config(self, config: dict) -> dict[str, str | dict]:
+    async def patch_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Modify the configuration for the vehicle."""
         headers = await self.stream.headers()
         resp = await self.stream._session.patch(
@@ -141,9 +142,9 @@ class TeslemetryStreamVehicle:
             json=config,
             raise_for_status=False,
         )
-        return await resp.json()
+        return cast(dict[str, Any], await resp.json())
 
-    async def post_config(self, config: dict) -> dict[str, str | dict]:
+    async def post_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Overwrite the configuration for the vehicle."""
         headers = await self.stream.headers()
         resp = await self.stream._session.post(
@@ -152,7 +153,7 @@ class TeslemetryStreamVehicle:
             json=config,
             raise_for_status=False,
         )
-        return await resp.json()
+        return cast(dict[str, Any], await resp.json())
 
     async def add_field(self, field: Signal | str, interval: int | None = None) -> None:
         """Handle vehicle data from the stream."""
@@ -191,7 +192,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_VehicleData(
-        self, callback: Callable[[dict], None]
+        self, callback: Callable[[dict[str, Any]], None]
     ) -> Callable[[], None]:
         """Listen for Vehicle Data polling."""
         return self.stream.async_add_listener(
@@ -214,7 +215,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_Alerts(
-        self, callback: Callable[[list[dict]], None]
+        self, callback: Callable[[list[dict[str, Any]]], None]
     ) -> Callable[[], None]:
         """Listen for Alerts."""
         return self.stream.async_add_listener(
@@ -222,7 +223,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_Errors(
-        self, callback: Callable[[list[dict]], None]
+        self, callback: Callable[[list[dict[str, Any]]], None]
     ) -> Callable[[], None]:
         """Listen for Errors."""
         return self.stream.async_add_listener(
@@ -1055,7 +1056,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_DoorState(
-        self, callback: Callable[[dict | None], None]
+        self, callback: Callable[[dict[str, Any] | None], None]
     ) -> Callable[[], None]:
         """Listen for Door State."""
         self._enable_field(Signal.DOOR_STATE)
@@ -2741,7 +2742,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_SemitruckTractorParkBrakeStatus(
-        self, callback: Callable[[dict | None], None]
+        self, callback: Callable[[dict[str, Any] | None], None]
     ) -> Callable[[], None]:
         """Listen for Semitruck Tractor Park Brake Status."""
         self._enable_field(Signal.SEMITRUCK_TRACTOR_PARK_BRAKE_STATUS)
@@ -2754,7 +2755,7 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_SemitruckTrailerParkBrakeStatus(
-        self, callback: Callable[[dict | None], None]
+        self, callback: Callable[[dict[str, Any] | None], None]
     ) -> Callable[[], None]:
         """Listen for Semitruck Trailer Park Brake Status."""
         self._enable_field(Signal.SEMITRUCK_TRAILER_PARK_BRAKE_STATUS)
@@ -2789,10 +2790,10 @@ class TeslemetryStreamVehicle:
 
 def make_int(
     signal: Signal, callback: Callable[[int | None], None]
-) -> Callable[[dict], None]:
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if isinstance(data, str):
             # Handle invalid and None?
@@ -2804,10 +2805,10 @@ def make_int(
 
 def make_float(
     signal: Signal, callback: Callable[[float | None], None]
-) -> Callable[[dict], None]:
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if isinstance(data, str):
             # Handle invalid and None?
@@ -2819,10 +2820,10 @@ def make_float(
 
 def make_bool(
     signal: Signal, callback: Callable[[bool | None], None]
-) -> Callable[[dict], None]:
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if isinstance(data, str):
             # Handle invalid and None?
@@ -2833,11 +2834,11 @@ def make_bool(
 
 
 def make_dict(
-    signal: Signal, callback: Callable[[dict | None], None]
-) -> Callable[[dict], None]:
+    signal: Signal, callback: Callable[[dict[str, Any] | None], None]
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if not isinstance(data, dict):
             data = None
@@ -2848,10 +2849,10 @@ def make_dict(
 
 def make_location(
     signal: Signal, callback: Callable[[TeslaLocation | None], None]
-) -> Callable[[dict], None]:
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if isinstance(data, dict) and "longitude" in data and "latitude" in data:
             callback(
@@ -2865,10 +2866,10 @@ def make_location(
 
 def make_datetime(
     signal: Signal, callback: Callable[[datetime | None], None]
-) -> Callable[[dict], None]:
+) -> Callable[[dict[str, Any]], None]:
     """Listener factory"""
 
-    def typer(event: dict):
+    def typer(event: dict[str, Any]) -> None:
         data = event["data"][signal]
         if isinstance(data, int):
             try:
@@ -2880,7 +2881,7 @@ def make_datetime(
     return typer
 
 
-def merge(source, destination):
+def merge(source: dict[Any, Any], destination: dict[Any, Any]) -> dict[Any, Any]:
     for key, value in source.items():
         if isinstance(value, dict):
             node = destination.setdefault(key, {})

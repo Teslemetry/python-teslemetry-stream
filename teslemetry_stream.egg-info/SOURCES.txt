@@ -2,9 +2,9 @@ LICENSE
 README.md
 pyproject.toml
 teslemetry_stream/__init__.py
-teslemetry_stream/compare_signals.py
 teslemetry_stream/const.py
 teslemetry_stream/exception.py
+teslemetry_stream/py.typed
 teslemetry_stream/stream.py
 teslemetry_stream/vehicle.py
 teslemetry_stream.egg-info/PKG-INFO

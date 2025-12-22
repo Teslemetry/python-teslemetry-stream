@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: teslemetry_stream
-Version: 0.7.10
+Version: 0.8.2
 Summary: Teslemetry Streaming API library for Python
 Author-email: Brett Adams <hello@teslemetry.com>
 License-Expression: Apache-2.0
