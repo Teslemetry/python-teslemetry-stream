@@ -22,3 +22,6 @@ dependencies = ["aiohttp"]
 
 [tool.setuptools.packages.find]
 include = ["teslemetry_stream*"]
+
+[tool.setuptools.package-data]
+teslemetry_stream = ["py.typed"]
