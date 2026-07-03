@@ -9,7 +9,7 @@ Python type delivered to the consumer callback.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Callable
 
 from teslemetry_stream.const import Signal
 from teslemetry_stream.vehicle import TeslemetryStreamVehicle
@@ -26,8 +26,13 @@ class FakeStream:
         # maps Signal value -> wrapped listener callback
         self.captured: dict[str, Any] = {}
 
-    def async_add_listener(self, callback, filters=None):
+    def async_add_listener(
+        self,
+        callback: Callable[[dict[str, Any]], None],
+        filters: dict[str, Any] | None = None,
+    ) -> Callable[[], None]:
         # filters carries {"vin": ..., "data": {Signal: None}} — grab the field
+        assert filters is not None
         signal = next(iter(filters["data"]))
         self.captured[signal] = callback
         return lambda: None
@@ -54,7 +59,16 @@ def deliver(stream: FakeStream, signal: Signal, raw: Any) -> Any:
 async def main() -> None:
     results: list[tuple[str, Any, str, Any, str, bool]] = []
 
-    def check(label, signal, register, raw, expected, expected_type):
+    def check(
+        label: str,
+        signal: Signal,
+        register: Callable[
+            [TeslemetryStreamVehicle, Callable[[Any], None]], Any
+        ],
+        raw: Any,
+        expected: Any,
+        expected_type: type,
+    ) -> None:
         vehicle, stream = build_vehicle()
         delivered: dict[str, Any] = {}
         register(vehicle, lambda v: delivered.__setitem__("v", v))
