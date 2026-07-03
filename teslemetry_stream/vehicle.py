@@ -580,24 +580,22 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_ClimateSeatCoolingFrontLeft(
-        self, callback: Callable[[str | None], None]
+        self, callback: Callable[[int | None], None]
     ) -> Callable[[], None]:
         """Listen for Climate Seat Cooling Front Left."""
         self._enable_field(Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT)
         return self.stream.async_add_listener(
-            lambda x: callback(
-                x["data"][Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT]
-            ),  # This should enum but I dont know what
+            make_int(Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT, callback),
             {"vin": self.vin, "data": {Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT: None}},
         )
 
     def listen_ClimateSeatCoolingFrontRight(
-        self, callback: Callable[[str | None], None]
+        self, callback: Callable[[int | None], None]
     ) -> Callable[[], None]:
         """Listen for Climate Seat Cooling Front Right."""
         self._enable_field(Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT]),
+            make_int(Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT, callback),
             {"vin": self.vin, "data": {Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT: None}},
         )
 
@@ -618,18 +616,20 @@ class TeslemetryStreamVehicle:
     ) -> Callable[[], None]:
         """Listen for Cruise Set Speed."""
         self._enable_field(Signal.CRUISE_SET_SPEED)
+        # fields.json declares this "real" (float), but real-world streamed
+        # values are always whole numbers, so we deliver it as int.
         return self.stream.async_add_listener(
             make_int(Signal.CRUISE_SET_SPEED, callback),
             {"vin": self.vin, "data": {Signal.CRUISE_SET_SPEED: None}},
         )
 
     def listen_CurrentLimitMph(
-        self, callback: Callable[[int | None], None]
+        self, callback: Callable[[float | None], None]
     ) -> Callable[[], None]:
         """Listen for Current Limit MPH."""
         self._enable_field(Signal.CURRENT_LIMIT_MPH)
         return self.stream.async_add_listener(
-            make_int(Signal.CURRENT_LIMIT_MPH, callback),
+            make_float(Signal.CURRENT_LIMIT_MPH, callback),
             {"vin": self.vin, "data": {Signal.CURRENT_LIMIT_MPH: None}},
         )
 
@@ -1010,6 +1010,8 @@ class TeslemetryStreamVehicle:
     ) -> Callable[[], None]:
         """Listen for Drive Inverter Torque Motor."""
         self._enable_field(Signal.DI_TORQUEMOTOR)
+        # fields.json declares this "real" (float), but real-world streamed
+        # values are always whole numbers, so we deliver it as int.
         return self.stream.async_add_listener(
             make_int(Signal.DI_TORQUEMOTOR, callback),
             {"vin": self.vin, "data": {Signal.DI_TORQUEMOTOR: None}},
@@ -1226,6 +1228,8 @@ class TeslemetryStreamVehicle:
     ) -> Callable[[], None]:
         """Listen for Expected Energy Percent at Trip Arrival."""
         self._enable_field(Signal.EXPECTED_ENERGY_PERCENT_AT_TRIP_ARRIVAL)
+        # fields.json declares this "real" (float), but real-world streamed
+        # values are always whole numbers, so we deliver it as int.
         return self.stream.async_add_listener(
             make_int(Signal.EXPECTED_ENERGY_PERCENT_AT_TRIP_ARRIVAL, callback),
             {
@@ -2206,12 +2210,12 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_SoftwareUpdateScheduledStartTime(
-        self, callback: Callable[[str | None], None]
+        self, callback: Callable[[int | None], None]
     ) -> Callable[[], None]:
         """Listen for Software Update Scheduled Start Time."""
         self._enable_field(Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME]),
+            make_int(Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME, callback),
             {
                 "vin": self.vin,
                 "data": {Signal.SOFTWARE_UPDATE_SCHEDULED_START_TIME: None},
