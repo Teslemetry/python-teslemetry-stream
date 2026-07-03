@@ -580,24 +580,22 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_ClimateSeatCoolingFrontLeft(
-        self, callback: Callable[[str | None], None]
+        self, callback: Callable[[int | None], None]
     ) -> Callable[[], None]:
         """Listen for Climate Seat Cooling Front Left."""
         self._enable_field(Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT)
         return self.stream.async_add_listener(
-            lambda x: callback(
-                x["data"][Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT]
-            ),  # This should enum but I dont know what
+            make_int(Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT, callback),
             {"vin": self.vin, "data": {Signal.CLIMATE_SEAT_COOLING_FRONT_LEFT: None}},
         )
 
     def listen_ClimateSeatCoolingFrontRight(
-        self, callback: Callable[[str | None], None]
+        self, callback: Callable[[int | None], None]
     ) -> Callable[[], None]:
         """Listen for Climate Seat Cooling Front Right."""
         self._enable_field(Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT]),
+            make_int(Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT, callback),
             {"vin": self.vin, "data": {Signal.CLIMATE_SEAT_COOLING_FRONT_RIGHT: None}},
         )
 
