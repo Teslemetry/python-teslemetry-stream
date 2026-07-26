@@ -64,15 +64,19 @@ LOGGER = logging.getLogger(__package__)
 class TeslemetryStreamVehicle:
     """Handle streaming field updates."""
 
-    fields: dict[str, dict[str, int]] = {}
-    preferTyped: bool | None = None
-    _config: dict[str, Any] = {}
+    fields: dict[str, dict[str, int]]
+    preferTyped: bool | None
+    _config: dict[str, Any]
 
     def __init__(self, stream: TeslemetryStream, vin: str):
         # A dictionary of TelemetryField keys and null values
         self.stream = stream
         self.vin: str = vin
         self.lock = asyncio.Lock()
+        # Per-instance: class-level dicts would share pending config between vehicles
+        self.fields = {}
+        self.preferTyped = None
+        self._config = {}
 
     @property
     def config(self) -> dict[str, Any]:
@@ -121,17 +125,31 @@ class TeslemetryStreamVehicle:
                     "Error updating streaming config for %s: %s", self.vin, error
                 )
                 return
-            elif data.get("response", {}).get("updated_vehicles"):
-                LOGGER.info("Updated vehicle streaming config for %s", self.vin)
-                if fields := self._config.get("fields"):
-                    LOGGER.debug(
-                        "Configured streaming fields %s", ", ".join(fields.keys())
-                    )
-                    self.fields = {**self.fields, **fields}
-                if prefer_typed := self._config.get("prefer_typed") in [True, False]:
-                    LOGGER.debug("Configured streaming typed to %s", prefer_typed)
-                    self.preferTyped = prefer_typed
-                self._config.clear()
+
+            ignored = data.get("ignoredFields") or []
+            if ignored:
+                LOGGER.warning(
+                    "Streaming fields not available for %s and were ignored: %s",
+                    self.vin,
+                    ", ".join(ignored),
+                )
+
+            LOGGER.info("Updated vehicle streaming config for %s", self.vin)
+            if fields := self._config.get("fields"):
+                # The API dropped the ignored ones, so they are not configured.
+                # A requested default has no options; record it as an empty mapping.
+                applied = {
+                    field: value or {}
+                    for field, value in fields.items()
+                    if field not in ignored
+                }
+                LOGGER.debug("Configured streaming fields %s", ", ".join(applied))
+                self.fields = {**self.fields, **applied}
+            prefer_typed = self._config.get("prefer_typed")
+            if isinstance(prefer_typed, bool):
+                LOGGER.debug("Configured streaming typed to %s", prefer_typed)
+                self.preferTyped = prefer_typed
+            self._config.clear()
 
     async def patch_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Modify the configuration for the vehicle."""
