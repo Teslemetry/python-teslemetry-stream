@@ -6,6 +6,12 @@ rejection left the merged pending config in place, so every already-scheduled
 listener task replayed the identical PATCH serially - one full write per
 listener. This asserts the batch collapses to exactly one upstream call, and
 that a later explicit trigger (not the same batch) still gets to retry.
+
+It also covers a follow-on defect in the single-flight fix itself: a waiter
+is joined to the shared flush with a plain ``await``, so cancelling (or
+timing out) one caller propagates into the shared task and cancels the
+flush out from under every other waiter, leaving the coalesced config
+unapplied. Waiters must join the flush shielded from their own cancellation.
 """
 from __future__ import annotations
 
@@ -114,6 +120,46 @@ async def main() -> None:
         check(
             "recovery is recorded once upstream accepts the retry",
             all(f in vehicle.fields for f in fields) and "LaterField" in vehicle.fields,
+            f"fields {sorted(vehicle.fields)}",
+        )
+    )
+
+    # A batch of concurrent callers joins one shared flush. Cancelling one of
+    # them mid-flight (here, during the debounce sleep, before the PATCH is
+    # even sent) must not cancel the flush out from under the others.
+    vehicle = make_vehicle(VIN, [ACCEPTED])
+    cancel_fields = [f"CancelField{i}" for i in range(5)]
+    tasks = [asyncio.ensure_future(vehicle.add_field(f)) for f in cancel_fields]
+    await asyncio.sleep(0.05)  # let every caller merge in and join the flush
+    cancelled_task = tasks[2]
+    cancelled_task.cancel()
+
+    cancelled_raised = False
+    try:
+        await cancelled_task
+    except asyncio.CancelledError:
+        cancelled_raised = True
+
+    remaining = [t for t in tasks if t is not cancelled_task]
+    await asyncio.wait_for(asyncio.gather(*remaining), timeout=5)
+
+    results.append(
+        check(
+            "the cancelled caller itself observes CancelledError",
+            cancelled_raised,
+        )
+    )
+    results.append(
+        check(
+            "cancelling one waiter does not abort the shared flush",
+            len(vehicle.sent) == 1,  # type: ignore[attr-defined]
+            f"sent {len(vehicle.sent)} PATCH(es)",  # type: ignore[attr-defined]
+        )
+    )
+    results.append(
+        check(
+            "the other concurrent callers still complete with the applied config",
+            all(f in vehicle.fields for f in cancel_fields),
             f"fields {sorted(vehicle.fields)}",
         )
     )

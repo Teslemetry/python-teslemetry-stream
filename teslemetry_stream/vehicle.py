@@ -128,7 +128,10 @@ class TeslemetryStreamVehicle:
                 flight = asyncio.ensure_future(self._flush())
                 self._flight = flight
 
-        await flight
+        # Shielded: if this caller is cancelled or times out, it must not
+        # cancel the shared flush that every other waiter is also awaiting.
+        # The cancelled caller still sees CancelledError; the flush continues.
+        await asyncio.shield(flight)
 
     async def _flush(self) -> None:
         """Coalesce the pending config into one PATCH and apply the result.
