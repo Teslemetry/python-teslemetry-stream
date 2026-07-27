@@ -6,6 +6,8 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable, cast
 
+import aiohttp
+
 from .const import (
     BMSState,
     CabinOverheatProtectionModeState,
@@ -67,6 +69,7 @@ class TeslemetryStreamVehicle:
     fields: dict[str, dict[str, int]]
     preferTyped: bool | None
     _config: dict[str, Any]
+    _flight: asyncio.Task[None] | None
 
     def __init__(self, stream: TeslemetryStream, vin: str):
         # A dictionary of TelemetryField keys and null values
@@ -77,6 +80,10 @@ class TeslemetryStreamVehicle:
         self.fields = {}
         self.preferTyped = None
         self._config = {}
+        # The single in-flight (or most recently completed) coalesced flush.
+        # Callers that arrive while it is running merge into `_config` and
+        # await it instead of starting their own PATCH.
+        self._flight = None
 
     @property
     def config(self) -> dict[str, Any]:
@@ -107,11 +114,32 @@ class TeslemetryStreamVehicle:
         req.raise_for_status()
 
     async def update_config(self, config: dict[str, Any]) -> None:
-        """Update the configuration for the vehicle."""
+        """Request a configuration update for the vehicle.
 
-        # Lock so that we dont change the config while making the API call
+        Merges into the pending desired config and joins the single in-flight
+        flush for this vehicle rather than starting a new one, so that a
+        batch of listeners scheduled at the same time produces one PATCH.
+        """
+
         async with self.lock:
             self._config = merge(config, self._config)
+            flight = self._flight
+            if flight is None or flight.done():
+                flight = asyncio.ensure_future(self._flush())
+                self._flight = flight
+
+        # Shielded: if this caller is cancelled or times out, it must not
+        # cancel the shared flush that every other waiter is also awaiting.
+        # The cancelled caller still sees CancelledError; the flush continues.
+        await asyncio.shield(flight)
+
+    async def _flush(self) -> None:
+        """Coalesce the pending config into one PATCH and apply the result.
+
+        On a deterministic upstream rejection (an error-shaped body), the
+        batch is terminal: it is not replayed, but the desired config is
+        left in place for the next explicit trigger to attempt again.
+        """
 
         await asyncio.sleep(1)
 
@@ -119,7 +147,10 @@ class TeslemetryStreamVehicle:
             if not self._config:
                 return
 
-            data = await self.patch_config(self._config)
+            data = await self._patch_with_bounded_retry(self._config)
+            if data is None:
+                return
+
             if error := data.get("error"):
                 LOGGER.error(
                     "Error updating streaming config for %s: %s", self.vin, error
@@ -150,6 +181,29 @@ class TeslemetryStreamVehicle:
                 LOGGER.debug("Configured streaming typed to %s", prefer_typed)
                 self.preferTyped = prefer_typed
             self._config.clear()
+
+    async def _patch_with_bounded_retry(
+        self, config: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """PATCH the config, allowing one retry for a transport-level failure.
+
+        A response that the server actually answered (including an
+        error-shaped body) is not a transport failure and is returned as-is
+        for the caller to classify.
+        """
+        for attempt in (1, 2):
+            try:
+                return await self.patch_config(config)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                LOGGER.error(
+                    "Network error updating streaming config for %s (attempt %s/2): %s",
+                    self.vin,
+                    attempt,
+                    error,
+                )
+                if attempt == 1:
+                    await asyncio.sleep(1)
+        return None
 
     async def patch_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Modify the configuration for the vehicle."""
