@@ -1,13 +1,19 @@
-"""Checks energy site listener filtering against PR 310's SSE event shapes.
+"""Checks energy site listener filtering against PR 310/316's SSE event shapes.
 
 Fixtures mirror the `liveStatusSchema`/`siteInfoSchema` from Teslemetry/api
 PR 310: a flat envelope of `createdAt`, `site_id`, optional `isCache`, and
 the full document under `live_status`/`site_info` (opaque, not a delta).
+`energy_totals` fixtures mirror PR 316's notification schema (renamed
+from `calendar_history_refreshed` to `energy_totals` post-merge): the
+uniform notification shape
+(`id`/`product_type`/`topic`/`url`/`createdAt`/`isCache`) plus a compact
+`totals` object - no `site_id` key, the site id rides `id` instead.
 """
 from __future__ import annotations
 
 from typing import Any
 
+from teslemetry_stream.const import EnergyHistoryTotals
 from teslemetry_stream.stream import TeslemetryStream, recursive_match
 
 SITE_A = "12345"
@@ -53,6 +59,45 @@ OTHER_SITE_LIVE_STATUS: dict[str, Any] = {
     "createdAt": "2026-07-28T10:16:00.000Z",
     "site_id": SITE_B,
     "live_status": {"battery_power": 0},
+}
+
+ENERGY_TOTALS_FIXTURE: dict[str, float | None] = {
+    "solar_energy_exported": 12.3,
+    "generator_energy_exported": None,
+    "grid_energy_imported": 4.5,
+    "grid_services_energy_imported": None,
+    "grid_services_energy_exported": None,
+    "grid_energy_exported_from_solar": None,
+    "grid_energy_exported_from_generator": None,
+    "grid_energy_exported_from_battery": None,
+    "battery_energy_exported": 1.1,
+    "battery_energy_imported_from_grid": None,
+    "battery_energy_imported_from_solar": None,
+    "battery_energy_imported_from_generator": None,
+    "consumer_energy_imported_from_grid": None,
+    "consumer_energy_imported_from_solar": None,
+    "consumer_energy_imported_from_battery": None,
+    "consumer_energy_imported_from_generator": None,
+    "total_home_usage": 20.0,
+    "total_battery_charge": None,
+    "total_battery_discharge": None,
+    "total_solar_generation": 12.3,
+    "total_grid_energy_exported": None,
+}
+
+ENERGY_TOTALS_EVENT: dict[str, Any] = {
+    "id": SITE_A,
+    "product_type": "energy_site",
+    "topic": "energy_totals",
+    "url": f"/api/1/energy_sites/{SITE_A}/calendar_history?kind=energy&period=day",
+    "createdAt": "2026-07-29T10:16:00.000Z",
+    "isCache": False,
+    "totals": ENERGY_TOTALS_FIXTURE,
+}
+
+OTHER_SITE_ENERGY_TOTALS: dict[str, Any] = {
+    **ENERGY_TOTALS_EVENT,
+    "id": SITE_B,
 }
 
 CREDITS_EVENT: dict[str, Any] = {
@@ -134,6 +179,48 @@ def main() -> None:
     results.append(
         check(
             "listen_SiteInfo ignores live_status events",
+            received == [],
+            f"got {received}",
+        )
+    )
+
+    # listen_EnergyTotals receives the parsed totals dataclass.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    totals_received: list[EnergyHistoryTotals] = []
+    site.listen_EnergyTotals(totals_received.append)
+    dispatch(stream, ENERGY_TOTALS_EVENT)
+    results.append(
+        check(
+            "listen_EnergyTotals parses the totals dict",
+            totals_received == [EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE)],
+            f"got {totals_received}",
+        )
+    )
+
+    # An energy_totals event for another site is not delivered.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    totals_received = []
+    site.listen_EnergyTotals(totals_received.append)
+    dispatch(stream, OTHER_SITE_ENERGY_TOTALS)
+    results.append(
+        check(
+            "a different site's energy_totals is filtered out",
+            totals_received == [],
+            f"got {totals_received}",
+        )
+    )
+
+    # listen_LiveStatus does not receive energy_totals events.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    received = []
+    site.listen_LiveStatus(received.append)
+    dispatch(stream, ENERGY_TOTALS_EVENT)
+    results.append(
+        check(
+            "listen_LiveStatus ignores energy_totals events",
             received == [],
             f"got {received}",
         )

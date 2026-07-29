@@ -29,6 +29,11 @@ class Key(StrEnum):
     SITE_INFO = "site_info"
     IS_CACHE = "isCache"
     CREATED_AT = "createdAt"
+    ID = "id"
+    PRODUCT_TYPE = "product_type"
+    TOPIC = "topic"
+    URL = "url"
+    TOTALS = "totals"
 
 
 class Signal(StrEnum):
@@ -309,6 +314,56 @@ class Status(StrEnum):
 
     CONNECTED = "CONNECTED"
     DISCONNECTED = "DISCONNECTED"
+
+
+class ProductType(StrEnum):
+    """Product types carried by the uniform refresh-notification schema."""
+
+    ENERGY_SITE = "energy_site"
+
+
+class RefreshTopic(StrEnum):
+    """Topics carried by the uniform refresh-notification schema."""
+
+    ENERGY_TOTALS = "energy_totals"
+
+
+@dataclass
+class EnergyHistoryTotals:
+    """Cumulative per-type totals from a refreshed energy_totals document.
+
+    Mirrors the api's `ENERGY_HISTORY_TOTAL_FIELDS` (same names, same
+    order): each field sums that quantity across the polled day's
+    time_series, and stays `None` rather than 0 when the field never
+    appeared in any period.
+    """
+
+    solar_energy_exported: float | None
+    generator_energy_exported: float | None
+    grid_energy_imported: float | None
+    grid_services_energy_imported: float | None
+    grid_services_energy_exported: float | None
+    grid_energy_exported_from_solar: float | None
+    grid_energy_exported_from_generator: float | None
+    grid_energy_exported_from_battery: float | None
+    battery_energy_exported: float | None
+    battery_energy_imported_from_grid: float | None
+    battery_energy_imported_from_solar: float | None
+    battery_energy_imported_from_generator: float | None
+    consumer_energy_imported_from_grid: float | None
+    consumer_energy_imported_from_solar: float | None
+    consumer_energy_imported_from_battery: float | None
+    consumer_energy_imported_from_generator: float | None
+    total_home_usage: float | None
+    total_battery_charge: float | None
+    total_battery_discharge: float | None
+    total_solar_generation: float | None
+    total_grid_energy_exported: float | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, float | None]) -> "EnergyHistoryTotals":
+        """Build from the event's `totals` dict."""
+        return cls(**{field: data.get(field) for field in cls.__dataclass_fields__})
 
 
 @dataclass
