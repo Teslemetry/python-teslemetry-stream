@@ -44,14 +44,32 @@ class TeslemetryStreamEnergySite:
     ) -> Callable[[], None]:
         """Listen for energy site info.
 
-        The callback receives the full site_info document. On connect (and
-        whenever a snapshot exists), an initial event is delivered with
-        `isCache` set, matching the same snapshot-then-live semantics as
-        vehicle state.
+        The callback receives the site_info document. This document no
+        longer carries `tariff_content`/`tariff_content_v2` - subscribe to
+        `listen_TariffContentV2` for the V2 tariff, or use the REST
+        site_info endpoint for the full Tesla-shaped document including
+        both tariffs. On connect (and whenever a snapshot exists), an
+        initial event is delivered with `isCache` set, matching the same
+        snapshot-then-live semantics as vehicle state.
         """
         return self.stream.async_add_listener(
             lambda x: callback(x[Key.SITE_INFO]),
             {Key.SITE_ID: self.site_id, Key.SITE_INFO: None},
+        )
+
+    def listen_TariffContentV2(
+        self, callback: Callable[[dict[str, Any] | None], None]
+    ) -> Callable[[], None]:
+        """Listen for the site's V2 tariff document.
+
+        The callback receives the `tariff_content_v2` document verbatim, or
+        `None` when the server sends an explicit removal signal (the
+        site's V2 tariff was cleared). Published only when it changes -
+        silence means no change, never staleness, matching `listen_SiteInfo`.
+        """
+        return self.stream.async_add_listener(
+            lambda x: callback(x[Key.TARIFF_CONTENT_V2]),
+            {Key.SITE_ID: self.site_id, Key.TARIFF_CONTENT_V2: None},
         )
 
     def listen_EnergyTotals(

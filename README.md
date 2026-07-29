@@ -151,6 +151,22 @@ async def main():
 > **Note:** Energy site streaming ships flag-gated behind [Teslemetry/api#310](https://github.com/Teslemetry/api/pull/310).
 > Until that server feature is enabled, `listen_LiveStatus`/`listen_SiteInfo` will simply never fire.
 
+`site_info` never carries `tariff_content`/`tariff_content_v2` - the site's V2
+tariff is its own `tariff_content_v2` event, published only when it changes.
+Like `site_info`, event silence means no change, never staleness; freshness
+always lives in a REST call, never in event cadence. A `None` body is an
+explicit removal signal (the site's V2 tariff was cleared), not "no data yet".
+
+```python
+        def tariff_callback(tariff_content_v2):
+            if tariff_content_v2 is None:
+                print("V2 tariff removed")
+            else:
+                print(f"Tariff code: {tariff_content_v2.get('code')}")
+
+        remove_tariff_listener = site.listen_TariffContentV2(tariff_callback)
+```
+
 A third event, `energy_totals`, fires when the server's periodic
 `calendar_history` poll detects the day's history actually changed. It never
 carries the full time series - just cumulative per-type totals and a `url`
@@ -164,10 +180,38 @@ change, never a stale value.
         remove_energy_totals_listener = site.listen_EnergyTotals(energy_totals_callback)
 ```
 
+## SSE Topic Selection
+
+By default a connection receives every applicable event (legacy-all
+behavior, unchanged forever). Pass `topics` to `TeslemetryStream` to
+subscribe to only the SSE wire events you need - an exact allowlist,
+comma-joined onto the connection's `topics` query parameter:
+
+```python
+from teslemetry_stream import TeslemetryStream, SseTopic, SSE_ENERGY_TOPICS
+
+stream = TeslemetryStream(
+    access_token="<token>",
+    session=session,
+    topics=[SseTopic.LIVE_STATUS, SseTopic.SITE_INFO],
+)
+
+# Or use a preset that expands client-side to every topic in a group:
+stream = TeslemetryStream(
+    access_token="<token>",
+    session=session,
+    topics=SSE_ENERGY_TOPICS,
+)
+```
+
+`SseTopic` is the closed set of exact wire names the server recognizes;
+`SSE_VEHICLE_TOPICS`, `SSE_ENERGY_TOPICS`, and `SSE_ALL_TOPICS` are
+convenience presets that expand to those exact names client-side.
+
 ## Public Methods in TeslemetryStream Class
 
-### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False)`
-Initialize the TeslemetryStream client.
+### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False, manual: bool = False, topics: str | Iterable[str] | None = None)`
+Initialize the TeslemetryStream client. `topics` is an optional exact SSE wire event allowlist (see `SseTopic`) - a single topic or an iterable of them; omitting it preserves legacy-all behavior.
 
 ### `get_vehicle(vin: str) -> TeslemetryStreamVehicle`
 Create a vehicle object to manage config and create listeners.
@@ -260,7 +304,10 @@ Initialize the TeslemetryStreamEnergySite instance.
 Listen for energy site live status events. The callback receives the full `live_status` document.
 
 ### `listen_SiteInfo(callback: Callable[[dict], None]) -> Callable[[],None]`
-Listen for energy site info events. The callback receives the full `site_info` document.
+Listen for energy site info events. The callback receives the `site_info` document. This document never carries `tariff_content`/`tariff_content_v2` - use `listen_TariffContentV2` for the V2 tariff.
+
+### `listen_TariffContentV2(callback: Callable[[dict | None], None]) -> Callable[[],None]`
+Listen for the site's V2 tariff document. The callback receives the `tariff_content_v2` document verbatim, or `None` when the server sends an explicit removal signal. Published only when it changes.
 
 ### `listen_EnergyTotals(callback: Callable[[EnergyHistoryTotals], None]) -> Callable[[],None]`
 Listen for `energy_totals` refresh notifications. The callback receives an `EnergyHistoryTotals` dataclass of cumulative per-type totals - never the full time series. Fires only when the server's periodic history poll detects a change; a consumer wanting the full series should GET the underlying event's `url` via their own REST client.

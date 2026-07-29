@@ -34,6 +34,7 @@ class Key(StrEnum):
     TOPIC = "topic"
     URL = "url"
     TOTALS = "totals"
+    TARIFF_CONTENT_V2 = "tariff_content_v2"
 
 
 class Signal(StrEnum):
@@ -326,6 +327,60 @@ class RefreshTopic(StrEnum):
     """Topics carried by the uniform refresh-notification schema."""
 
     ENERGY_TOTALS = "energy_totals"
+
+
+class SseTopic(StrEnum):
+    """Exact SSE wire event names selectable via `TeslemetryStream(topics=...)`.
+
+    Mirrors the api's closed `SSE_TOPICS` set (`src/lib/sseTopics.ts`) - a
+    name here must match the server's allowlist exactly, since the server
+    validates `topics` and 400s on anything it does not recognize.
+    """
+
+    STATE = "state"
+    DATA = "data"
+    ALERTS = "alerts"
+    ERRORS = "errors"
+    CONNECTIVITY = "connectivity"
+    VEHICLE_DATA = "vehicle_data"
+    CONFIG = "config"
+    LIVE_STATUS = "live_status"
+    SITE_INFO = "site_info"
+    TARIFF_CONTENT_V2 = "tariff_content_v2"
+    ENERGY_TOTALS = "energy_totals"
+    CREDITS = "credits"
+
+
+#: Convenience preset - every vehicle topic. Expands client-side to exact
+#: wire names; passing this to `TeslemetryStream(topics=...)` is equivalent
+#: to legacy-all for a vehicle connection, minus energy/account topics.
+SSE_VEHICLE_TOPICS: tuple[SseTopic, ...] = (
+    SseTopic.STATE,
+    SseTopic.DATA,
+    SseTopic.ALERTS,
+    SseTopic.ERRORS,
+    SseTopic.CONNECTIVITY,
+    SseTopic.VEHICLE_DATA,
+    SseTopic.CONFIG,
+)
+
+#: Convenience preset - every energy site topic.
+SSE_ENERGY_TOPICS: tuple[SseTopic, ...] = (
+    SseTopic.LIVE_STATUS,
+    SseTopic.SITE_INFO,
+    SseTopic.TARIFF_CONTENT_V2,
+    SseTopic.ENERGY_TOTALS,
+)
+
+#: Convenience preset - every account-wide topic.
+SSE_ACCOUNT_TOPICS: tuple[SseTopic, ...] = (SseTopic.CREDITS,)
+
+#: Convenience preset - every known topic, equivalent to omitting `topics`.
+SSE_ALL_TOPICS: tuple[SseTopic, ...] = (
+    *SSE_VEHICLE_TOPICS,
+    *SSE_ENERGY_TOPICS,
+    *SSE_ACCOUNT_TOPICS,
+)
 
 
 @dataclass
