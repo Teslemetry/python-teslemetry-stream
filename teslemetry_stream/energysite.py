@@ -75,16 +75,19 @@ class TeslemetryStreamEnergySite:
     def listen_ComposedSiteInfo(
         self, callback: Callable[[dict[str, Any]], None]
     ) -> Callable[[], None]:
-        """Listen for a whole-document view combining site_info and tariff.
+        """Listen for a view composing the two streamed site_info pieces.
 
         Merges the latest slim `site_info` with the last known
         `tariff_content_v2` piece under a `tariff_content_v2` key, so
-        consumers get the same shape the REST site_info endpoint returns
-        without hand-assembling it from two separate listeners. Fires
-        whenever either half updates; nothing is emitted until the first
-        `site_info` document has arrived. `tariff_content_v2` is `None`
-        until a value has been received, and again after an explicit
-        removal.
+        consumers don't have to hand-assemble the two separate listeners
+        themselves. This only ever carries what the stream itself carries -
+        slim `site_info` plus the V2 tariff - never the legacy V1
+        `tariff_content`, which has no SSE topic and stays REST-only by
+        design; a consumer needing V1 must fetch the REST site_info
+        endpoint directly. Fires whenever either half updates; nothing is
+        emitted until the first `site_info` document has arrived.
+        `tariff_content_v2` is `None` until a value has been received, and
+        again after an explicit removal.
         """
         state: dict[str, Any] = {"site_info": None, "tariff_content_v2": None}
 
