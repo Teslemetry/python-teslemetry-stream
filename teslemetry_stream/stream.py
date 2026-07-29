@@ -27,7 +27,7 @@ class TeslemetryStream:
         vin: str | None = None,
         parse_timestamp: bool = False,
         manual: bool = False,
-        topics: Iterable[str] | None = None,
+        topics: str | Iterable[str] | None = None,
     ):
         """
         Initialize the TeslemetryStream client.
@@ -39,11 +39,12 @@ class TeslemetryStream:
         :param parse_timestamp: Whether to parse timestamps.
         :param manual: Whether to start listening manually.
         :param topics: Exact SSE wire event names (see `SseTopic` and its
-            presets in `const.py`) to subscribe to. Omitting this (`None`)
-            preserves legacy-all behavior: every applicable event is
-            delivered unfiltered, forever. An explicitly empty iterable is
-            rejected - it means "no topics", not "all topics", mirroring
-            the server's own 400 on an empty `topics` value.
+            presets in `const.py`) to subscribe to - a single topic or an
+            iterable of them. Omitting this (`None`) preserves legacy-all
+            behavior: every applicable event is delivered unfiltered,
+            forever. An explicitly empty iterable is rejected - it means
+            "no topics", not "all topics", mirroring the server's own 400
+            on an empty `topics` value.
         """
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
@@ -53,7 +54,9 @@ class TeslemetryStream:
         self.vin = vin
         self.topics: list[str] | None
         if topics is not None:
-            self.topics = list(topics)
+            # A bare str (or SseTopic, itself a str) is iterable character-by-character -
+            # wrap it as a single topic rather than silently splitting it into letters.
+            self.topics = [topics] if isinstance(topics, str) else list(topics)
             if not self.topics:
                 raise ValueError(
                     "topics must not be empty - omit it (None) for legacy-all behavior"

@@ -210,8 +210,8 @@ convenience presets that expand to those exact names client-side.
 
 ## Public Methods in TeslemetryStream Class
 
-### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False, manual: bool = False, topics: Iterable[str] | None = None)`
-Initialize the TeslemetryStream client. `topics` is an optional exact SSE wire event allowlist (see `SseTopic`); omitting it preserves legacy-all behavior.
+### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False, manual: bool = False, topics: str | Iterable[str] | None = None)`
+Initialize the TeslemetryStream client. `topics` is an optional exact SSE wire event allowlist (see `SseTopic`) - a single topic or an iterable of them; omitting it preserves legacy-all behavior.
 
 ### `get_vehicle(vin: str) -> TeslemetryStreamVehicle`
 Create a vehicle object to manage config and create listeners.

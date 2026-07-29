@@ -138,6 +138,28 @@ def main() -> None:
         )
     )
 
+    # A bare string is one topic, not an iterable of characters.
+    stream, session = make_stream(topics="state")
+    asyncio.run(stream.connect())
+    results.append(
+        check(
+            "a bare str topics value is treated as a single topic, not character-split",
+            session.calls[0]["params"] == {"topics": "state"},
+            f"got {session.calls[0]['params']}",
+        )
+    )
+
+    # A bare SseTopic member (itself a str) is likewise one topic.
+    stream, session = make_stream(topics=SseTopic.LIVE_STATUS)
+    asyncio.run(stream.connect())
+    results.append(
+        check(
+            "a bare SseTopic topics value is treated as a single topic, not character-split",
+            session.calls[0]["params"] == {"topics": "live_status"},
+            f"got {session.calls[0]['params']}",
+        )
+    )
+
     # listen_TariffContentV2 receives the tariff document verbatim.
     stream, _ = make_stream()
     site = stream.get_energysite(SITE_A)
