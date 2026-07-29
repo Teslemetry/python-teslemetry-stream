@@ -135,6 +135,19 @@ def main() -> None:
         )
     )
 
+    # An explicitly empty topics iterable is rejected, not treated as legacy-all.
+    raised = False
+    try:
+        make_stream(topics=[])
+    except ValueError:
+        raised = True
+    results.append(
+        check(
+            "an empty topics iterable raises ValueError instead of silently enabling legacy-all",
+            raised,
+        )
+    )
+
     # listen_TariffContentV2 receives the tariff document verbatim.
     stream, _ = make_stream()
     site = stream.get_energysite(SITE_A)

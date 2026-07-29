@@ -39,9 +39,11 @@ class TeslemetryStream:
         :param parse_timestamp: Whether to parse timestamps.
         :param manual: Whether to start listening manually.
         :param topics: Exact SSE wire event names (see `SseTopic` and its
-            presets in `const.py`) to subscribe to. Omitting this preserves
-            legacy-all behavior: every applicable event is delivered
-            unfiltered, forever.
+            presets in `const.py`) to subscribe to. Omitting this (`None`)
+            preserves legacy-all behavior: every applicable event is
+            delivered unfiltered, forever. An explicitly empty iterable is
+            rejected - it means "no topics", not "all topics", mirroring
+            the server's own 400 on an empty `topics` value.
         """
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
@@ -49,7 +51,15 @@ class TeslemetryStream:
         self.active: bool = False
         self.server = server
         self.vin = vin
-        self.topics = list(topics) if topics is not None else None
+        self.topics: list[str] | None
+        if topics is not None:
+            self.topics = list(topics)
+            if not self.topics:
+                raise ValueError(
+                    "topics must not be empty - omit it (None) for legacy-all behavior"
+                )
+        else:
+            self.topics = None
         self._listeners: dict[
             Callable[..., Any], tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None]
         ] = {}
