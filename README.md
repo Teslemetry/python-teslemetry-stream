@@ -151,6 +151,19 @@ async def main():
 > **Note:** Energy site streaming ships flag-gated behind [Teslemetry/api#310](https://github.com/Teslemetry/api/pull/310).
 > Until that server feature is enabled, `listen_LiveStatus`/`listen_SiteInfo` will simply never fire.
 
+A third event, `energy_totals`, fires when the server's periodic
+`calendar_history` poll detects the day's history actually changed. It never
+carries the full time series - just cumulative per-type totals and a `url`
+to re-fetch the full document via your own REST client. Silence means no
+change, never a stale value.
+
+```python
+        def energy_totals_callback(totals):
+            print(f"Total home usage: {totals.total_home_usage}")
+
+        remove_energy_totals_listener = site.listen_EnergyTotals(energy_totals_callback)
+```
+
 ## Public Methods in TeslemetryStream Class
 
 ### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False)`
@@ -248,3 +261,6 @@ Listen for energy site live status events. The callback receives the full `live_
 
 ### `listen_SiteInfo(callback: Callable[[dict], None]) -> Callable[[],None]`
 Listen for energy site info events. The callback receives the full `site_info` document.
+
+### `listen_EnergyTotals(callback: Callable[[EnergyHistoryTotals], None]) -> Callable[[],None]`
+Listen for `energy_totals` refresh notifications. The callback receives an `EnergyHistoryTotals` dataclass of cumulative per-type totals - never the full time series. Fires only when the server's periodic history poll detects a change; a consumer wanting the full series should GET the underlying event's `url` via their own REST client.
