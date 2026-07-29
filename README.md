@@ -125,26 +125,27 @@ connect you get an initial snapshot event for each, the same way vehicle
 ```python
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with TeslemetryStream(
+        stream = TeslemetryStream(
             access_token="<token>",
             session=session,
-        ) as stream:
+        )
 
-            site = stream.get_energysite("<site_id>")
+        site = stream.get_energysite("<site_id>")
 
-            def live_status_callback(live_status):
-                print(f"Battery Power: {live_status.get('battery_power')}")
+        def live_status_callback(live_status):
+            print(f"Battery Power: {live_status.get('battery_power')}")
 
-            def site_info_callback(site_info):
-                print(f"Site Name: {site_info.get('site_name')}")
+        def site_info_callback(site_info):
+            print(f"Site Name: {site_info.get('site_name')}")
 
-            remove_live_status_listener = site.listen_LiveStatus(live_status_callback)
-            remove_site_info_listener = site.listen_SiteInfo(site_info_callback)
+        remove_live_status_listener = site.listen_LiveStatus(live_status_callback)
+        remove_site_info_listener = site.listen_SiteInfo(site_info_callback)
 
-            print("Running")
-            await asyncio.sleep(60)
-            remove_live_status_listener()
-            remove_site_info_listener()
+        print("Running")
+        await asyncio.sleep(60)
+        remove_live_status_listener()
+        remove_site_info_listener()
+        stream.close()
 ```
 
 > **Note:** Energy site streaming ships flag-gated behind [Teslemetry/api#310](https://github.com/Teslemetry/api/pull/310).
