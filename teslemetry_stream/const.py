@@ -24,6 +24,11 @@ class Key(StrEnum):
     STATE = "state"
     STATUS = "status"
     NETWORK_INTERFACE = "networkInterface"
+    SITE_ID = "site_id"
+    LIVE_STATUS = "live_status"
+    SITE_INFO = "site_info"
+    IS_CACHE = "isCache"
+    CREATED_AT = "createdAt"
 
 
 class Signal(StrEnum):
