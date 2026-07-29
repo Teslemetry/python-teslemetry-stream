@@ -7,7 +7,14 @@ from .exception import (
     TeslemetryStreamVehicleNotConfigured,
     TeslemetryStreamEnded
 )
-from .const import Signal, Alert
+from .const import (
+    Signal,
+    Alert,
+    SseTopic,
+    SSE_VEHICLE_TOPICS,
+    SSE_ENERGY_TOPICS,
+    SSE_ALL_TOPICS,
+)
 
 __all__ = [
     "TeslemetryStream",
@@ -18,5 +25,9 @@ __all__ = [
     "TeslemetryStreamVehicleNotConfigured",
     "TeslemetryStreamEnded",
     "Signal",
-    "Alert"
+    "Alert",
+    "SseTopic",
+    "SSE_VEHICLE_TOPICS",
+    "SSE_ENERGY_TOPICS",
+    "SSE_ALL_TOPICS",
 ]
