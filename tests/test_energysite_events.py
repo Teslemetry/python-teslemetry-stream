@@ -3,11 +3,9 @@
 Fixtures mirror the `liveStatusSchema`/`siteInfoSchema` from Teslemetry/api
 PR 310: a flat envelope of `createdAt`, `site_id`, optional `isCache`, and
 the full document under `live_status`/`site_info` (opaque, not a delta).
-`energy_totals` fixtures mirror PR 316's notification schema (renamed
-from `calendar_history_refreshed` to `energy_totals` post-merge): the
-uniform notification shape
-(`id`/`product_type`/`topic`/`url`/`createdAt`/`isCache`) plus a compact
-`totals` object - no `site_id` key, the site id rides `id` instead.
+`energy_totals` fixtures mirror PR 321's trimmed notification schema:
+`id`/`createdAt`/`totals`, with `isCache` present only when true - no
+`site_id`, `product_type`, `topic`, or `url` keys.
 """
 from __future__ import annotations
 
@@ -87,11 +85,7 @@ ENERGY_TOTALS_FIXTURE: dict[str, float | None] = {
 
 ENERGY_TOTALS_EVENT: dict[str, Any] = {
     "id": SITE_A,
-    "product_type": "energy_site",
-    "topic": "energy_totals",
-    "url": f"/api/1/energy_sites/{SITE_A}/calendar_history?kind=energy&period=day",
     "createdAt": "2026-07-29T10:16:00.000Z",
-    "isCache": False,
     "totals": ENERGY_TOTALS_FIXTURE,
 }
 

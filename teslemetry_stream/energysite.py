@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 
-from .const import EnergyHistoryTotals, Key, ProductType, RefreshTopic
+from .const import EnergyHistoryTotals, Key
 
 if TYPE_CHECKING:
     from .stream import TeslemetryStream
@@ -80,15 +80,13 @@ class TeslemetryStreamEnergySite:
         Unlike live_status/site_info, this event carries no full document -
         just cumulative totals and the event fires only when the server's
         5-minute poll actually detects a change. Silence means no change,
-        never staleness; there is no snapshot-on-connect delivery. A
-        consumer wanting the full time series must GET the event's `url`
-        via their own REST client - this listener only exposes the totals.
+        never staleness; there is no snapshot-on-connect delivery. This
+        listener only exposes the totals.
         """
         return self.stream.async_add_listener(
             lambda x: callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS])),
             {
                 Key.ID: self.site_id,
-                Key.PRODUCT_TYPE: ProductType.ENERGY_SITE,
-                Key.TOPIC: RefreshTopic.ENERGY_TOTALS,
+                Key.TOTALS: None,
             },
         )
