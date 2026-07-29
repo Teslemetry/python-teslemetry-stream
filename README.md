@@ -114,6 +114,43 @@ async def main():
         await stream.close()
 ```
 
+## Energy Site Streaming
+
+Energy sites stream two events, `live_status` and `site_info`. Unlike vehicle
+signals these are delivered as full documents rather than field deltas, and
+there is nothing to enable - subscribed sites are polled automatically. On
+connect you get an initial snapshot event for each, the same way vehicle
+`State` is delivered on connect.
+
+```python
+async def main():
+    async with aiohttp.ClientSession() as session:
+        stream = TeslemetryStream(
+            access_token="<token>",
+            session=session,
+        )
+
+        site = stream.get_energysite("<site_id>")
+
+        def live_status_callback(live_status):
+            print(f"Battery Power: {live_status.get('battery_power')}")
+
+        def site_info_callback(site_info):
+            print(f"Site Name: {site_info.get('site_name')}")
+
+        remove_live_status_listener = site.listen_LiveStatus(live_status_callback)
+        remove_site_info_listener = site.listen_SiteInfo(site_info_callback)
+
+        print("Running")
+        await asyncio.sleep(60)
+        remove_live_status_listener()
+        remove_site_info_listener()
+        stream.close()
+```
+
+> **Note:** Energy site streaming ships flag-gated behind [Teslemetry/api#310](https://github.com/Teslemetry/api/pull/310).
+> Until that server feature is enabled, `listen_LiveStatus`/`listen_SiteInfo` will simply never fire.
+
 ## Public Methods in TeslemetryStream Class
 
 ### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False)`
@@ -121,6 +158,9 @@ Initialize the TeslemetryStream client.
 
 ### `get_vehicle(vin: str) -> TeslemetryStreamVehicle`
 Create a vehicle object to manage config and create listeners.
+
+### `get_energysite(site_id: str | int) -> TeslemetryStreamEnergySite`
+Create an energy site object to create listeners for `live_status` and `site_info`.
 
 ### `connected -> bool`
 Return if connected.
@@ -197,3 +237,14 @@ Listen for vehicle error events. The callback receives a list of dictionaries co
 The `TeslemetryStreamVehicle` class contains a `listen_*` methods for each telemetry signal.
 These methods allow you to listen to specific signals and handle their data in a type-safe manner.
 A full list of fields and metadata can be found at [api.teslemetry.com/fields.json](https://api.teslemetry.com/fields.json)
+
+## Public Methods in TeslemetryStreamEnergySite Class
+
+### `__init__(stream: TeslemetryStream, site_id: str)`
+Initialize the TeslemetryStreamEnergySite instance.
+
+### `listen_LiveStatus(callback: Callable[[dict], None]) -> Callable[[],None]`
+Listen for energy site live status events. The callback receives the full `live_status` document.
+
+### `listen_SiteInfo(callback: Callable[[dict], None]) -> Callable[[],None]`
+Listen for energy site info events. The callback receives the full `site_info` document.

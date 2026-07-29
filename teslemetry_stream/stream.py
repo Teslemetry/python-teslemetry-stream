@@ -9,6 +9,7 @@ import aiohttp
 
 from .exception import TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
+from .energysite import TeslemetryStreamEnergySite
 
 LOGGER = logging.getLogger(__package__)
 
@@ -53,6 +54,7 @@ class TeslemetryStream:
         self.manual = manual
         self.retries: int = 0
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
+        self.energysites: dict[str, TeslemetryStreamEnergySite] = {}
         self.fields: dict[str, Any] = {}
 
         if self.vin:
@@ -79,6 +81,18 @@ class TeslemetryStream:
         if vin not in self.vehicles:
             self.vehicles[vin] = TeslemetryStreamVehicle(self, vin)
         return self.vehicles[vin]
+
+    def get_energysite(self, site_id: str | int) -> TeslemetryStreamEnergySite:
+        """
+        Create an energy site stream.
+
+        :param site_id: Numeric energy site ID.
+        :return: TeslemetryStreamEnergySite instance.
+        """
+        site_id = str(site_id)
+        if site_id not in self.energysites:
+            self.energysites[site_id] = TeslemetryStreamEnergySite(self, site_id)
+        return self.energysites[site_id]
 
     @property
     def connected(self) -> bool:
