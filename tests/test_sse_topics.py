@@ -1,6 +1,6 @@
 """Checks the api PR 318/319 SSE protocol additions: the `topics` allowlist
-query parameter, the `tariff_content_v2` topic (including null-as-removal),
-and the composed site_info+tariff helper.
+query parameter and the `tariff_content_v2` topic (including
+null-as-removal).
 
 Fixtures mirror the authoritative schemas in Teslemetry/api:
 - `src/lib/sseTopics.ts` for the exact wire topic names and `topics` being
@@ -28,16 +28,6 @@ SITE_INFO_SNAPSHOT: dict[str, Any] = {
     "site_info": {
         "site_name": "Home",
         "backup_reserve_percent": 20,
-        "default_real_mode": "self_consumption",
-    },
-}
-
-SITE_INFO_UPDATE: dict[str, Any] = {
-    "createdAt": "2026-07-29T10:16:00.000Z",
-    "site_id": SITE_A,
-    "site_info": {
-        "site_name": "Home",
-        "backup_reserve_percent": 25,
         "default_real_mode": "self_consumption",
     },
 }
@@ -189,80 +179,6 @@ def main() -> None:
             "listen_SiteInfo ignores tariff_content_v2 events",
             received == [SITE_INFO_SNAPSHOT["site_info"]],
             f"got {received}",
-        )
-    )
-
-    # listen_ComposedSiteInfo merges the latest site_info with the last tariff piece.
-    stream, _ = make_stream()
-    site = stream.get_energysite(SITE_A)
-    composed: list[dict[str, Any]] = []
-    site.listen_ComposedSiteInfo(composed.append)
-    dispatch(stream, SITE_INFO_SNAPSHOT)
-    results.append(
-        check(
-            "composed view emits site_info alone with tariff_content_v2=None first",
-            composed == [{**SITE_INFO_SNAPSHOT["site_info"], "tariff_content_v2": None}],
-            f"got {composed}",
-        )
-    )
-
-    dispatch(stream, TARIFF_SNAPSHOT)
-    results.append(
-        check(
-            "composed view merges in the tariff once it arrives",
-            composed[-1]
-            == {**SITE_INFO_SNAPSHOT["site_info"], "tariff_content_v2": TARIFF_SNAPSHOT["tariff_content_v2"]},
-            f"got {composed[-1]}",
-        )
-    )
-
-    dispatch(stream, SITE_INFO_UPDATE)
-    results.append(
-        check(
-            "composed view keeps the last tariff when only site_info updates",
-            composed[-1]
-            == {**SITE_INFO_UPDATE["site_info"], "tariff_content_v2": TARIFF_SNAPSHOT["tariff_content_v2"]},
-            f"got {composed[-1]}",
-        )
-    )
-
-    dispatch(stream, TARIFF_REMOVED)
-    results.append(
-        check(
-            "composed view reflects an explicit tariff removal as None",
-            composed[-1] == {**SITE_INFO_UPDATE["site_info"], "tariff_content_v2": None},
-            f"got {composed[-1]}",
-        )
-    )
-
-    # Nothing is emitted before the first site_info document arrives.
-    stream, _ = make_stream()
-    site = stream.get_energysite(SITE_A)
-    composed = []
-    site.listen_ComposedSiteInfo(composed.append)
-    dispatch(stream, TARIFF_SNAPSHOT)
-    results.append(
-        check(
-            "composed view withholds emission until site_info has arrived",
-            composed == [],
-            f"got {composed}",
-        )
-    )
-
-    # Removing the composed listener removes both underlying listeners.
-    stream, _ = make_stream()
-    site = stream.get_energysite(SITE_A)
-    composed = []
-    remove = site.listen_ComposedSiteInfo(composed.append)
-    dispatch(stream, SITE_INFO_SNAPSHOT)
-    remove()
-    dispatch(stream, TARIFF_SNAPSHOT)
-    dispatch(stream, SITE_INFO_UPDATE)
-    results.append(
-        check(
-            "removing the composed listener stops delivery from either half",
-            len(composed) == 1,
-            f"got {composed}",
         )
     )
 

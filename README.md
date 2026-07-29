@@ -167,21 +167,6 @@ explicit removal signal (the site's V2 tariff was cleared), not "no data yet".
         remove_tariff_listener = site.listen_TariffContentV2(tariff_callback)
 ```
 
-If you want the two streamed halves back together, `listen_ComposedSiteInfo`
-merges the latest `site_info` with the last known `tariff_content_v2` piece so
-you don't have to hand-assemble it from the two separate events. This only
-ever carries what the stream carries - it never restores the legacy V1
-`tariff_content`, which has no SSE topic and stays REST-only by design; fetch
-the REST site_info endpoint directly if you need V1:
-
-```python
-        def composed_callback(site_info):
-            print(f"Site Name: {site_info.get('site_name')}")
-            print(f"Tariff: {site_info.get('tariff_content_v2')}")
-
-        remove_composed_listener = site.listen_ComposedSiteInfo(composed_callback)
-```
-
 A third event, `energy_totals`, fires when the server's periodic
 `calendar_history` poll detects the day's history actually changed. It never
 carries the full time series - just cumulative per-type totals and a `url`
@@ -323,9 +308,6 @@ Listen for energy site info events. The callback receives the `site_info` docume
 
 ### `listen_TariffContentV2(callback: Callable[[dict | None], None]) -> Callable[[],None]`
 Listen for the site's V2 tariff document. The callback receives the `tariff_content_v2` document verbatim, or `None` when the server sends an explicit removal signal. Published only when it changes.
-
-### `listen_ComposedSiteInfo(callback: Callable[[dict], None]) -> Callable[[],None]`
-Listen for a view merging the latest `site_info` with the last known `tariff_content_v2` piece under a `tariff_content_v2` key, so consumers don't have to hand-assemble it from the two separate events. Carries only what the stream carries - it never restores the legacy V1 `tariff_content`, which stays REST-only; use the REST site_info endpoint for that.
 
 ### `listen_EnergyTotals(callback: Callable[[EnergyHistoryTotals], None]) -> Callable[[],None]`
 Listen for `energy_totals` refresh notifications. The callback receives an `EnergyHistoryTotals` dataclass of cumulative per-type totals - never the full time series. Fires only when the server's periodic history poll detects a change; a consumer wanting the full series should GET the underlying event's `url` via their own REST client.

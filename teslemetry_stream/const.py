@@ -351,51 +351,35 @@ class SseTopic(StrEnum):
     CREDITS = "credits"
 
 
-# Vehicle topics with a connect-time cache snapshot.
-SSE_VEHICLE_SNAPSHOT_TOPICS: tuple[SseTopic, ...] = (
+#: Convenience preset - every vehicle topic. Expands client-side to exact
+#: wire names; passing this to `TeslemetryStream(topics=...)` is equivalent
+#: to legacy-all for a vehicle connection, minus energy/account topics.
+SSE_VEHICLE_TOPICS: tuple[SseTopic, ...] = (
     SseTopic.STATE,
     SseTopic.DATA,
     SseTopic.ALERTS,
     SseTopic.ERRORS,
     SseTopic.CONNECTIVITY,
     SseTopic.VEHICLE_DATA,
-)
-
-# Vehicle topics that are live-only - never part of a connect-time snapshot.
-SSE_VEHICLE_LIVE_ONLY_TOPICS: tuple[SseTopic, ...] = (SseTopic.CONFIG,)
-
-# Energy site topics with a connect-time cache snapshot.
-SSE_ENERGY_SNAPSHOT_TOPICS: tuple[SseTopic, ...] = (
-    SseTopic.LIVE_STATUS,
-    SseTopic.SITE_INFO,
-    SseTopic.TARIFF_CONTENT_V2,
-)
-
-# Energy site topics that are live-only - never part of a connect-time snapshot.
-SSE_ENERGY_LIVE_ONLY_TOPICS: tuple[SseTopic, ...] = (SseTopic.ENERGY_TOTALS,)
-
-# Account-wide topics with a connect-time cache snapshot.
-SSE_ACCOUNT_SNAPSHOT_TOPICS: tuple[SseTopic, ...] = (SseTopic.CREDITS,)
-
-#: Convenience preset - every vehicle topic. Expands client-side to exact
-#: wire names; passing this to `TeslemetryStream(topics=...)` is equivalent
-#: to legacy-all for a vehicle connection, minus energy/account topics.
-SSE_VEHICLE_TOPICS: tuple[SseTopic, ...] = (
-    *SSE_VEHICLE_SNAPSHOT_TOPICS,
-    *SSE_VEHICLE_LIVE_ONLY_TOPICS,
+    SseTopic.CONFIG,
 )
 
 #: Convenience preset - every energy site topic.
 SSE_ENERGY_TOPICS: tuple[SseTopic, ...] = (
-    *SSE_ENERGY_SNAPSHOT_TOPICS,
-    *SSE_ENERGY_LIVE_ONLY_TOPICS,
+    SseTopic.LIVE_STATUS,
+    SseTopic.SITE_INFO,
+    SseTopic.TARIFF_CONTENT_V2,
+    SseTopic.ENERGY_TOTALS,
 )
+
+#: Convenience preset - every account-wide topic.
+SSE_ACCOUNT_TOPICS: tuple[SseTopic, ...] = (SseTopic.CREDITS,)
 
 #: Convenience preset - every known topic, equivalent to omitting `topics`.
 SSE_ALL_TOPICS: tuple[SseTopic, ...] = (
     *SSE_VEHICLE_TOPICS,
     *SSE_ENERGY_TOPICS,
-    *SSE_ACCOUNT_SNAPSHOT_TOPICS,
+    *SSE_ACCOUNT_TOPICS,
 )
 
 

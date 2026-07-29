@@ -72,47 +72,6 @@ class TeslemetryStreamEnergySite:
             {Key.SITE_ID: self.site_id, Key.TARIFF_CONTENT_V2: None},
         )
 
-    def listen_ComposedSiteInfo(
-        self, callback: Callable[[dict[str, Any]], None]
-    ) -> Callable[[], None]:
-        """Listen for a view composing the two streamed site_info pieces.
-
-        Merges the latest slim `site_info` with the last known
-        `tariff_content_v2` piece under a `tariff_content_v2` key, so
-        consumers don't have to hand-assemble the two separate listeners
-        themselves. This only ever carries what the stream itself carries -
-        slim `site_info` plus the V2 tariff - never the legacy V1
-        `tariff_content`, which has no SSE topic and stays REST-only by
-        design; a consumer needing V1 must fetch the REST site_info
-        endpoint directly. Fires whenever either half updates; nothing is
-        emitted until the first `site_info` document has arrived.
-        `tariff_content_v2` is `None` until a value has been received, and
-        again after an explicit removal.
-        """
-        state: dict[str, Any] = {"site_info": None, "tariff_content_v2": None}
-
-        def emit() -> None:
-            if state["site_info"] is None:
-                return
-            callback({**state["site_info"], Key.TARIFF_CONTENT_V2: state["tariff_content_v2"]})
-
-        def on_site_info(site_info: dict[str, Any]) -> None:
-            state["site_info"] = site_info
-            emit()
-
-        def on_tariff(tariff_content_v2: dict[str, Any] | None) -> None:
-            state["tariff_content_v2"] = tariff_content_v2
-            emit()
-
-        remove_site_info = self.listen_SiteInfo(on_site_info)
-        remove_tariff = self.listen_TariffContentV2(on_tariff)
-
-        def remove_listener() -> None:
-            remove_site_info()
-            remove_tariff()
-
-        return remove_listener
-
     def listen_EnergyTotals(
         self, callback: Callable[[EnergyHistoryTotals], None]
     ) -> Callable[[], None]:
