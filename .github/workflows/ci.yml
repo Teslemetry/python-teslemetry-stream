@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Typecheck
+  lint:
+    name: Lint & type-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,8 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync
+      - name: Ruff
+        run: uv run --with ruff ruff check teslemetry_stream
       - name: Mypy
         run: uv run --with mypy mypy teslemetry_stream
 
@@ -43,7 +45,32 @@ jobs:
         run: uv sync --python ${{ matrix.python-version }}
       - name: Run tests
         run: |
-          for f in tests/test_*.py; do
+          shopt -s nullglob
+          files=(tests/test_*.py)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No test files found under tests/ - failing." >&2
+            exit 1
+          fi
+          for f in "${files[@]}"; do
             echo "Running $f"
             uv run python "$f"
           done
+
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Build
+        run: uv build
+      - name: Check build artifacts
+        run: uv run --with twine twine check dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*

@@ -3,7 +3,9 @@
 This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
 - Add durable project-specific notes here as they are discovered through real work.
-- CI runs on push/PR: `.github/workflows/ci.yml`. Uses `uv` (see `uv.lock`).
+- CI runs on push/PR: `.github/workflows/ci.yml`. Uses `uv` (see `uv.lock`). Three jobs: `lint` (ruff + mypy), `test` (matrix), `build` (`uv build` + `twine check` + artifact upload). Ruff and twine, like mypy, aren't declared dev dependencies - CI installs them ephemerally via `uv run --with <tool> <tool> ...`, matching the existing mypy pattern.
+- `[tool.ruff]` in `pyproject.toml` selects `E, F, W, I, B, UP, ASYNC, SIM, RUF` and ignores `RUF006` - the stream's background `listen`/refresh tasks (`stream.py`, `vehicle.py`) are intentionally untracked fire-and-forget `asyncio.create_task` calls, not a lint oversight.
+- The `test` job's step fails outright (non-zero exit) if `tests/test_*.py` matches nothing, rather than skipping - do not reintroduce a silent-skip fallback there.
 - `tests/` files are plain scripts (`if __name__ == "__main__"`), not pytest-based - pytest would collect zero tests here. Run each directly, e.g. `uv run python tests/test_field_type_coercion.py`.
 - `pyproject.toml` has a `[tool.mypy]` config but no dev-dependency group declares mypy, so `uv sync` alone won't install it. CI installs it ephemerally via `uv run --with mypy mypy teslemetry_stream`.
 - `Signal` in `const.py` tracks <https://api.teslemetry.com/fields.json>; the config route rejects names it does not know with `fst_err_validation`. Fields the API has retired are not rejected - it accepts the request and names them in a top-level `ignoredFields` list - so the library can lag the published list without breaking.

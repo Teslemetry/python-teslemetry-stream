@@ -1,10 +1,12 @@
 """Vehicle class for handling streaming field updates."""
 
 from __future__ import annotations
+
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 
