@@ -1,15 +1,17 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Iterable, cast
+from typing import Any, cast
 
 import aiohttp
 
+from .energysite import TeslemetryStreamEnergySite
 from .exception import TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
-from .energysite import TeslemetryStreamEnergySite
 
 LOGGER = logging.getLogger(__package__)
 
@@ -305,7 +307,7 @@ class TeslemetryStream:
                         return cast(dict[str, Any], data)
                 raise TeslemetryStreamEnded()
             except StopAsyncIteration as e:
-                # Re-raise StopAsyncIteration explicitly to ensure it's not caught by the general Exception handler
+                # Re-raise explicitly so it isn't caught by the generic Exception handler below
                 self.disconnect()
                 raise e
             except TeslemetryStreamEnded:
@@ -419,9 +421,8 @@ def recursive_match(dict1: dict[str, Any] | None, dict2: dict[str, Any]) -> bool
                     for item1 in value1
                 ):
                     return False
-            elif value1 is not None:
+            elif value1 is not None and value1 != value2:
                 # Check the value matches
-                if value1 != value2:
-                    return False
+                return False
     # No differences found
     return True

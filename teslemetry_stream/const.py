@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
@@ -416,7 +417,7 @@ class EnergyHistoryTotals:
     total_grid_energy_exported: float | None
 
     @classmethod
-    def from_dict(cls, data: dict[str, float | None]) -> "EnergyHistoryTotals":
+    def from_dict(cls, data: dict[str, float | None]) -> EnergyHistoryTotals:
         """Build from the event's `totals` dict."""
         return cls(**{field: data.get(field) for field in cls.__dataclass_fields__})
 

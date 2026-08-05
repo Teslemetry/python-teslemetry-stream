@@ -26,6 +26,16 @@ include = ["teslemetry_stream*"]
 [tool.setuptools.package-data]
 teslemetry_stream = ["py.typed"]
 
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+# RUF006: the stream's background listen/refresh tasks are intentionally
+# fire-and-forget for the lifetime of the connection, not tracked handles.
+ignore = ["RUF006"]
+
 [tool.mypy]
 python_version = "3.9"
 check_untyped_defs = true
