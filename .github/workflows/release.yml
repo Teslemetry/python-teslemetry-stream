@@ -104,6 +104,9 @@ jobs:
           path: dist/
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Reusable workflow: PEP 740 attestations sign under the top-level caller's identity, which PyPI's publisher-identity check rejects with a 400.
+          attestations: false
 
   github-release:
     name: Upload distribution to GitHub Release
