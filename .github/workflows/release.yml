@@ -1,0 +1,105 @@
+name: Release gate & publish
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version to build/test/publish with
+        required: false
+        type: string
+        default: "3.13"
+      pypi-project-url:
+        description: PyPI project URL shown on the environment deployment
+        required: true
+        type: string
+      environment-name:
+        description: Protected GitHub environment gating the publish step
+        required: false
+        type: string
+        default: pypi
+
+jobs:
+  gate:
+    name: Full CI gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python ${{ inputs.python-version }}
+        run: uv python install ${{ inputs.python-version }}
+      - name: Install dependencies
+        run: uv sync --python ${{ inputs.python-version }}
+      - name: Ruff
+        run: uv run --with ruff ruff check teslemetry_stream
+      - name: Mypy
+        run: uv run --with mypy mypy teslemetry_stream
+      - name: Run tests
+        run: |
+          shopt -s nullglob
+          files=(tests/test_*.py)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No test files found under tests/ - failing." >&2
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            echo "Running $f"
+            uv run python "$f"
+          done
+      - name: Build
+        run: uv build
+      - name: Check distribution
+        run: uv run --with twine twine check dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-to-pypi:
+    name: Publish distribution to PyPI
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment-name }}
+      url: ${{ inputs.pypi-project-url }}
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Upload distribution to GitHub Release
+    needs: publish-to-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # mandatory for making GitHub Releases
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create
+          '${{ github.ref_name }}'
+          --repo '${{ github.repository }}'
+          --generate-notes
+      - name: Upload artifacts to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          '${{ github.ref_name }}' dist/**
+          --repo '${{ github.repository }}'
