@@ -4,11 +4,10 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.13"
-  PYPI_PROJECT_URL: https://pypi.org/p/teslemetry-stream
-  ENVIRONMENT_NAME: pypi
 
 jobs:
   lint:
@@ -84,8 +83,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: ${{ env.ENVIRONMENT_NAME }}
-      url: ${{ env.PYPI_PROJECT_URL }}
+      name: pypi
+      url: https://pypi.org/p/teslemetry-stream
     permissions:
       id-token: write
     steps:
