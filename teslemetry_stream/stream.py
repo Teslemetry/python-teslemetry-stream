@@ -70,7 +70,9 @@ class TeslemetryStream:
         ] = {}
         self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
         self._listen_task: asyncio.Task[None] | None = None
-        self._connect_lock = asyncio.Lock()
+        # Created lazily in connect() - asyncio.Lock() requires a running
+        # loop on Python 3.9, and streams are commonly built before one.
+        self._connect_lock: asyncio.Lock | None = None
         self._session = session
         self.access_token = access_token
         self.parse_timestamp = parse_timestamp
@@ -232,6 +234,8 @@ class TeslemetryStream:
         if not self.server:
             await self.get_config()
 
+        if self._connect_lock is None:
+            self._connect_lock = asyncio.Lock()
         async with self._connect_lock:
             if not self.active:
                 # Stopped while waiting for the lock; a concurrent caller may
