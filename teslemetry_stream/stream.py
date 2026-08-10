@@ -69,6 +69,8 @@ class TeslemetryStream:
             Callable[..., Any], tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None]
         ] = {}
         self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
+        self._listen_task: asyncio.Task[None] | None = None
+        self._connect_lock = asyncio.Lock()
         self._session = session
         self.access_token = access_token
         self.parse_timestamp = parse_timestamp
@@ -230,44 +232,70 @@ class TeslemetryStream:
         if not self.server:
             await self.get_config()
 
-        LOGGER.debug("Connecting to %s", self.server)
-        url = f"https://{self.server}/sse"
-        if self.vin:
-            url += f"/{self.vin}"
-        headers = await self.headers()
-        params = {"topics": ",".join(self.topics)} if self.topics else None
-        self._response = await self._session.get(
-            url,
-            headers=headers,
-            params=params,
-            raise_for_status=True,
-            timeout=aiohttp.ClientTimeout(
-                connect=5, sock_connect=5, sock_read=30, total=None
-            ),
-            chunked=True,
-        )
-        LOGGER.debug(
-            "Connected to %s with status %s", self._response.url, self._response.status
-        )
-        self.retries = 0
-        self._update_connection_listeners(True)
+        async with self._connect_lock:
+            if not self.active:
+                # Stopped while waiting for the lock; a concurrent caller may
+                # already be connected, or a stop was requested outright.
+                return
+
+            LOGGER.debug("Connecting to %s", self.server)
+            url = f"https://{self.server}/sse"
+            if self.vin:
+                url += f"/{self.vin}"
+            headers = await self.headers()
+            params = {"topics": ",".join(self.topics)} if self.topics else None
+            response = await self._session.get(
+                url,
+                headers=headers,
+                params=params,
+                raise_for_status=True,
+                timeout=aiohttp.ClientTimeout(
+                    connect=5, sock_connect=5, sock_read=30, total=None
+                ),
+                chunked=True,
+            )
+            if not self.active:
+                # Stopped while the request was in flight - discard it rather
+                # than publish a response nobody will ever close.
+                response.close()
+                return
+            if self._response is not None:
+                self._response.close()
+            self._response = response
+            LOGGER.debug(
+                "Connected to %s with status %s", self._response.url, self._response.status
+            )
+            self.retries = 0
+            self._update_connection_listeners(True)
 
     def disconnect(self) -> None:
         """
         Disconnect from the telemetry stream.
         """
-        self.active = False
         self.close()
 
-    def close(self) -> None:
+    def _close_response(self) -> None:
         """
-        Close connection.
+        Close the current response, if any, without changing whether the
+        stream is meant to keep running - used by reconnect paths and by
+        listen()'s cleanup, as opposed to close()'s full stop.
         """
         if self._response is not None:
             LOGGER.debug("Disconnecting from %s", self.server)
             self._response.close()
             self._response = None
-        self._update_connection_listeners(False)
+            self._update_connection_listeners(False)
+
+    def close(self) -> None:
+        """
+        Stop the stream: closes the response and cancels the owned listen
+        task so a running listener does not immediately reconnect.
+        """
+        self.active = False
+        task, self._listen_task = self._listen_task, None
+        if task is not None and not task.done():
+            task.cancel()
+        self._close_response()
 
     def __aiter__(self) -> TeslemetryStream:
         """
@@ -312,17 +340,17 @@ class TeslemetryStream:
                 raise e
             except TeslemetryStreamEnded:
                 LOGGER.warning("Stream ended by server")
-                self.close()
+                self._close_response()
             except aiohttp.ClientError as error:
                 LOGGER.warning("Client error: %s", repr(error))
-                self.close()
+                self._close_response()
                 delay = min(2**self.retries, 600)
                 LOGGER.debug("Reconnecting in %s seconds", delay)
                 await asyncio.sleep(delay)
                 self.retries += 1
             except Exception as error:
                 LOGGER.error("Unexpected error: %s", repr(error))
-                self.close()
+                self._close_response()
                 LOGGER.debug("Reconnecting in %s seconds", 1)
                 await asyncio.sleep(1)
 
@@ -347,28 +375,52 @@ class TeslemetryStream:
             self._listeners.pop(remove_listener)
             if not self._listeners:
                 LOGGER.info("Shutting down stream as there are no more listeners")
-                self.active = False
+                self.close()
 
         self._listeners[remove_listener] = (callback, filters)
 
-        # This is the first listener, set up task.
-        if schedule_refresh and not self.manual:
-            asyncio.create_task(self.listen())
+        # This is the first listener - start the owned listen task, unless
+        # one is already running or manual mode delegates that to the caller.
+        if (
+            schedule_refresh
+            and not self.manual
+            and (self._listen_task is None or self._listen_task.done())
+        ):
+            self._listen_task = asyncio.create_task(self.listen())
 
         return remove_listener
 
     async def listen(self) -> None:
         """
         Listen to the telemetry stream.
+
+        A second concurrent call joins the already-running owned task
+        instead of starting a competing reader on the same connection.
         """
-        async for event in self:
-            if event:
-                for listener, filters in self._listeners.values():
-                    if recursive_match(filters, event):
-                        try:
-                            listener(event)
-                        except Exception as error:
-                            LOGGER.error("Uncaught error in listener: %s", error)
+        current_task = asyncio.current_task()
+        existing_task = self._listen_task
+        if (
+            existing_task is not None
+            and not existing_task.done()
+            and existing_task is not current_task
+        ):
+            await existing_task
+            return
+
+        self._listen_task = current_task
+        try:
+            async for event in self:
+                if event:
+                    for listener, filters in self._listeners.values():
+                        if recursive_match(filters, event):
+                            try:
+                                listener(event)
+                            except Exception as error:
+                                LOGGER.error("Uncaught error in listener: %s", error)
+        finally:
+            self._close_response()
+            if self._listen_task is current_task:
+                self._listen_task = None
         LOGGER.debug("Listen has finished")
 
     def listen_Credits(
