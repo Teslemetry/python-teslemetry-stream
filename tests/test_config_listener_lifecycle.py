@@ -1,6 +1,6 @@
 """Regression tests for the vehicle config-sync listener's lifecycle.
 
-Two defects flagged in review of the config-consume feature:
+Defects flagged across review of the config-consume feature:
 
 - Eagerly registering the internal config listener in
   ``TeslemetryStreamVehicle.__init__`` called ``TeslemetryStream.
@@ -15,11 +15,16 @@ Two defects flagged in review of the config-consume feature:
   trigger once every real/public listener was gone - the SSE connection
   leaked open. ``async_add_listener(..., internal=True)`` now excludes it
   from that check.
-- While disconnected (e.g. right after that auto-close), the config-sync
-  listener can't observe a server-side change, so add_field/prefer_typed's
-  no-op check could trust a stale record and wrongly skip a change the
-  server actually needs. Both now refresh via the REST ``get_config()``
-  before that check whenever ``stream.connected`` is false.
+- The config-sync listener can only observe a server-side change while
+  connected AND the ``config`` topic isn't filtered out via
+  ``TeslemetryStream(topics=...)``. A first attempt at handling this forced
+  a REST refresh before the no-op check whenever disconnected - but that
+  added a failure path and could storm the API with GETs for a batch of
+  callers. Reverted: the no-op *skip* is purely an optimization (a
+  redundant PATCH is harmless), so it's now gated on the record actually
+  being live-maintained (``_record_is_live()``) rather than force-freshened;
+  otherwise add_field/prefer_typed just send unconditionally, exactly the
+  pre-feature status quo.
 """
 from __future__ import annotations
 
@@ -32,29 +37,10 @@ from teslemetry_stream.vehicle import TeslemetryStreamVehicle
 VIN = "TESTVIN0000000001"
 
 
-class FakeConfigResponse:
-    """Stand-in for the aiohttp response get_config() awaits .json() on."""
-
-    def __init__(self, body: dict[str, Any]) -> None:
-        self.status = 200
-        self._body = body
-
-    async def json(self) -> dict[str, Any]:
-        return self._body
-
-
 class FakeSession:
-    """Serves the config REST endpoint; any other GET (e.g. a real SSE
-    connect) is unexpected in these tests."""
-
-    def __init__(self) -> None:
-        self.config_response: dict[str, Any] = {"fields": {}, "prefer_typed": False}
-        self.get_calls = 0
+    """A session whose get() is never expected to be called in these tests."""
 
     async def get(self, url: str, **kwargs: Any) -> Any:
-        if "/api/config/" in url:
-            self.get_calls += 1
-            return FakeConfigResponse(self.config_response)
         raise AssertionError(f"unexpected session.get({url!r}) - these tests must not connect")
 
 
@@ -76,6 +62,20 @@ def make_stream(**kwargs: Any) -> TeslemetryStream:
     )
 
 
+def make_vehicle_with_capture(
+    stream: TeslemetryStream,
+) -> tuple[TeslemetryStreamVehicle, list[dict[str, Any]]]:
+    vehicle = TeslemetryStreamVehicle(stream, VIN)
+    sent: list[dict[str, Any]] = []
+
+    async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
+        sent.append(dict(config))
+        return {"updated_vehicles": 1}
+
+    vehicle.patch_config = patch_config  # type: ignore[assignment,method-assign]
+    return vehicle, sent
+
+
 def test_sync_construction_without_a_loop() -> bool:
     """Must run before any event loop exists - constructing a stream+vehicle
     synchronously (the library's documented pre-async-context usage) must not
@@ -91,7 +91,7 @@ def test_sync_construction_without_a_loop() -> bool:
 
 async def test_lazy_registration_happens_on_first_use(results: list[bool]) -> None:
     stream = make_stream()
-    vehicle = TeslemetryStreamVehicle(stream, VIN)
+    vehicle, _sent = make_vehicle_with_capture(stream)
 
     results.append(
         check(
@@ -101,10 +101,6 @@ async def test_lazy_registration_happens_on_first_use(results: list[bool]) -> No
         )
     )
 
-    async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
-        return {"updated_vehicles": 1}
-
-    vehicle.patch_config = patch_config  # type: ignore[assignment,method-assign]
     await vehicle.add_field("BatteryLevel")
 
     results.append(
@@ -124,12 +120,8 @@ async def test_lazy_registration_happens_on_first_use(results: list[bool]) -> No
 
 async def test_auto_close_after_last_public_listener_removed(results: list[bool]) -> None:
     stream = make_stream()
-    vehicle = TeslemetryStreamVehicle(stream, VIN)
+    vehicle, _sent = make_vehicle_with_capture(stream)
 
-    async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
-        return {"updated_vehicles": 1}
-
-    vehicle.patch_config = patch_config  # type: ignore[assignment,method-assign]
     # Registers the internal (excluded) listener.
     await vehicle.add_field("BatteryLevel")
 
@@ -162,71 +154,71 @@ async def test_auto_close_after_last_public_listener_removed(results: list[bool]
     )
 
 
-async def test_stale_record_refreshed_before_noop_check_when_disconnected(
-    results: list[bool],
-) -> None:
-    """Close via last-public-listener removal, mutate config externally
-    (simulated via the REST fixture), then re-add - add_field must not
-    wrongly no-op against the now-stale locally cached record."""
+async def test_cold_stream_add_field_sends_patch_unconditionally(results: list[bool]) -> None:
+    """A never-connected (or disconnected) stream can't have observed a
+    server-side change, so the no-op skip must not apply - send the PATCH
+    unconditionally rather than trying to force the record fresh."""
     stream = make_stream()
-    vehicle = TeslemetryStreamVehicle(stream, VIN)
+    vehicle, sent = make_vehicle_with_capture(stream)
+    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}  # matches the request below
 
-    async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
-        return {"updated_vehicles": 1}
+    results.append(check("the stream starts disconnected", not stream.connected))
 
-    vehicle.patch_config = patch_config  # type: ignore[assignment,method-assign]
-
-    # Establish a locally cached record while "connected".
-    stream._response = object()  # type: ignore[assignment]
-    stream._session.config_response = {  # type: ignore[attr-defined]
-        "fields": {"BatteryLevel": {"interval_seconds": 60}},
-        "prefer_typed": False,
-    }
-    await vehicle.add_field("BatteryLevel", 60)
-    results.append(
-        check(
-            "the record is established while connected",
-            vehicle.fields.get("BatteryLevel") == {"interval_seconds": 60},
-            f"fields {vehicle.fields}",
-        )
-    )
-
-    # Last public listener removed -> auto-close -> disconnected. The config
-    # response fixture is mutated externally while unreachable.
-    remove_public = stream.async_add_listener(lambda event: None)
-    stream._response = None
-    remove_public()
-    results.append(check("the stream is disconnected", not stream.connected))
-
-    stream._session.config_response = {  # type: ignore[attr-defined]
-        "fields": {"BatteryLevel": {"interval_seconds": 30}},
-        "prefer_typed": False,
-    }
-
-    sent: list[dict[str, Any]] = []
-
-    async def patch_config_after_reconnect(config: dict[str, Any]) -> dict[str, Any]:
-        sent.append(dict(config))
-        return {"updated_vehicles": 1}
-
-    vehicle.patch_config = patch_config_after_reconnect  # type: ignore[assignment,method-assign]
-
-    # Re-add, still disconnected: the stale record (BatteryLevel@60) matches
-    # what's being requested, so an un-fixed no-op check would wrongly skip.
-    get_calls_before = stream._session.get_calls  # type: ignore[attr-defined]
     await vehicle.add_field("BatteryLevel", 60)
 
     results.append(
         check(
-            "add_field refreshes from the REST API before the no-op check",
-            stream._session.get_calls == get_calls_before + 1,  # type: ignore[attr-defined]
-            f"get_calls {stream._session.get_calls}",  # type: ignore[attr-defined]
-        )
-    )
-    results.append(
-        check(
-            "add_field does not wrongly no-op against the stale record",
+            "add_field sends the PATCH even though the record already matches",
             len(sent) == 1 and sent[0]["fields"]["BatteryLevel"] == {"interval_seconds": 60},
+            f"sent {sent}",
+        )
+    )
+
+
+async def test_filtered_config_topic_sends_patch_unconditionally(results: list[bool]) -> None:
+    """Even while connected, if `topics=` filters out the config topic the
+    config-sync listener never receives anything - the record can't be
+    trusted, so the no-op skip must not apply."""
+    stream = make_stream(topics=["state"])
+    vehicle, sent = make_vehicle_with_capture(stream)
+    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
+
+    stream._response = object()  # type: ignore[assignment]  # simulate a live connection
+    results.append(check("the stream is connected", stream.connected))
+
+    await vehicle.add_field("BatteryLevel", 60)
+
+    results.append(
+        check(
+            "add_field sends the PATCH when the config topic is filtered out",
+            len(sent) == 1 and sent[0]["fields"]["BatteryLevel"] == {"interval_seconds": 60},
+            f"sent {sent}",
+        )
+    )
+
+
+async def test_connected_and_subscribed_record_match_skips(results: list[bool]) -> None:
+    """The no-op skip only applies once both conditions hold: connected, and
+    the config topic isn't filtered out (default `topics=None` subscribes
+    to everything)."""
+    stream = make_stream()
+    vehicle, sent = make_vehicle_with_capture(stream)
+    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
+
+    stream._response = object()  # type: ignore[assignment]  # simulate a live connection
+    results.append(
+        check(
+            "the stream is connected and subscribed to every topic",
+            stream.connected and stream.topics is None,
+        )
+    )
+
+    await vehicle.add_field("BatteryLevel", 60)
+
+    results.append(
+        check(
+            "add_field skips the PATCH when the record is live-maintained and matches",
+            sent == [],
             f"sent {sent}",
         )
     )
@@ -236,7 +228,9 @@ async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
     await test_lazy_registration_happens_on_first_use(results)
     await test_auto_close_after_last_public_listener_removed(results)
-    await test_stale_record_refreshed_before_noop_check_when_disconnected(results)
+    await test_cold_stream_add_field_sends_patch_unconditionally(results)
+    await test_filtered_config_topic_sends_patch_unconditionally(results)
+    await test_connected_and_subscribed_record_match_skips(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
