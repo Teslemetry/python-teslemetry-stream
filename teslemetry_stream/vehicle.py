@@ -87,11 +87,16 @@ class TeslemetryStreamVehicle:
         # Callers that arrive while it is running merge into `_config` and
         # await it instead of starting their own PATCH.
         self._flight = None
-        # Registration is deferred to first use (see _ensure_config_listener) -
-        # eagerly calling async_add_listener here would create the stream's
-        # owned task via asyncio.create_task before a loop necessarily exists,
-        # breaking a synchronous `TeslemetryStream(vin=...)`/vehicle construction.
-        self._config_listener_registered = False
+        # Registered from birth, not lazily, so no connection can ever
+        # predate this listener and miss a config event. Safe outside a
+        # running loop: `internal=True` makes async_add_listener's
+        # schedule_refresh unconditionally False, so it never reaches the
+        # asyncio.create_task() call that requires one.
+        self.stream.async_add_listener(
+            self._on_config_event,
+            {Key.VIN: self.vin, Key.CONFIG: None},
+            internal=True,
+        )
 
     @property
     def config(self) -> dict[str, Any]:
@@ -120,24 +125,6 @@ class TeslemetryStreamVehicle:
             return
 
         req.raise_for_status()
-
-    def _ensure_config_listener(self) -> None:
-        """Register the internal config-sync listener once, lazily.
-
-        Keeps `fields`/`preferTyped` current when the server applies a
-        config change outside this client (another client, the console,
-        a Teslemetry-side migration), so add_field/prefer_typed's no-op
-        checks don't act on stale history. Marked `internal` so it doesn't
-        pin the stream open once every public listener is removed.
-        """
-        if self._config_listener_registered:
-            return
-        self._config_listener_registered = True
-        self.stream.async_add_listener(
-            self._on_config_event,
-            {Key.VIN: self.vin, Key.CONFIG: None},
-            internal=True,
-        )
 
     def _on_config_event(self, event: dict[str, Any]) -> None:
         """Sync the record from a server-pushed config event.
@@ -188,7 +175,6 @@ class TeslemetryStreamVehicle:
         flush for this vehicle rather than starting a new one, so that a
         batch of listeners scheduled at the same time produces one PATCH.
         """
-        self._ensure_config_listener()
 
         async with self.lock:
             self._config = merge(config, self._config)
@@ -298,7 +284,6 @@ class TeslemetryStreamVehicle:
 
     async def add_field(self, field: Signal | str, interval: int | None = None) -> None:
         """Handle vehicle data from the stream."""
-        self._ensure_config_listener()
         if isinstance(field, Signal):
             field = field.value
 
@@ -319,7 +304,6 @@ class TeslemetryStreamVehicle:
 
     async def prefer_typed(self, prefer_typed: bool) -> None:
         """Set prefer typed."""
-        self._ensure_config_listener()
         if self._record_is_live() and self.preferTyped == prefer_typed:
             return
         await self.update_config({"prefer_typed": prefer_typed})

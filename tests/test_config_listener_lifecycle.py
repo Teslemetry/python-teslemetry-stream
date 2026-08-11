@@ -2,29 +2,36 @@
 
 Defects flagged across review of the config-consume feature:
 
-- Eagerly registering the internal config listener in
-  ``TeslemetryStreamVehicle.__init__`` called ``TeslemetryStream.
-  async_add_listener()`` -> ``asyncio.create_task()`` for the very first
-  listener, which requires a running event loop. That broke the
-  previously-synchronous ``TeslemetryStream(vin=...)``/vehicle
-  construction. Registration is now deferred to first use (inside
-  ``add_field``/``prefer_typed``/``update_config``, all async).
-- The internal listener, once registered, stayed in
-  ``TeslemetryStream._listeners`` forever, so the "last listener removed"
-  auto-close check (which fires on an empty ``_listeners``) could never
-  trigger once every real/public listener was gone - the SSE connection
-  leaked open. ``async_add_listener(..., internal=True)`` now excludes it
-  from that check.
+- A first attempt eagerly registered the internal config listener in
+  ``TeslemetryStreamVehicle.__init__``, which risked ``TeslemetryStream.
+  async_add_listener()`` -> ``asyncio.create_task()`` needing a running
+  event loop. That was worked around by deferring registration to first
+  use (inside ``add_field``/``prefer_typed``/``update_config``) - but
+  lazy registration left a gap: a stream that was already connected
+  before the listener existed could have dispatched a config event that
+  was simply never seen.
+- The actual fix for the loop hazard was structural, not timing:
+  ``async_add_listener(..., internal=True)`` makes its
+  ``schedule_refresh`` (the gate on the ``asyncio.create_task()`` call)
+  unconditionally false for an internal-only registration - so
+  registering the config listener eagerly in ``__init__`` is safe outside
+  a running loop, and the lazy-registration gap is gone: the listener
+  exists from construction, so no connection can ever predate it.
+- The same ``internal=True`` flag also excludes it from the "last
+  listener removed" auto-close check (and its counterpart "first listener
+  starts the task" check) - otherwise a permanently-registered internal
+  listener would keep ``_listeners`` non-empty forever, and a later public
+  listener's own zero-to-one transition couldn't restart a closed stream.
 - The config-sync listener can only observe a server-side change while
   connected AND the ``config`` topic isn't filtered out via
-  ``TeslemetryStream(topics=...)``. A first attempt at handling this forced
-  a REST refresh before the no-op check whenever disconnected - but that
-  added a failure path and could storm the API with GETs for a batch of
-  callers. Reverted: the no-op *skip* is purely an optimization (a
-  redundant PATCH is harmless), so it's now gated on the record actually
-  being live-maintained (``_record_is_live()``) rather than force-freshened;
-  otherwise add_field/prefer_typed just send unconditionally, exactly the
-  pre-feature status quo.
+  ``TeslemetryStream(topics=...)``. A separate attempt at handling *that*
+  forced a REST refresh before the no-op check whenever disconnected -
+  reverted, since it added a failure path and could storm the API with
+  GETs for a batch of callers. The no-op *skip* is purely an optimization
+  (a redundant PATCH is harmless), so it's gated on the record actually
+  being live-maintained (``_record_is_live()``) rather than
+  force-freshened; otherwise add_field/prefer_typed just send
+  unconditionally, exactly the pre-feature status quo.
 """
 from __future__ import annotations
 
@@ -79,33 +86,32 @@ def make_vehicle_with_capture(
 def test_sync_construction_without_a_loop() -> bool:
     """Must run before any event loop exists - constructing a stream+vehicle
     synchronously (the library's documented pre-async-context usage) must not
-    require or start one."""
+    require or start one, and the config listener must already be registered
+    by the time construction returns (internal=True never reaches the
+    asyncio.create_task() call that would need a loop)."""
     label = "TeslemetryStream(vin=...) construction outside a running loop does not raise"
     try:
+        # TeslemetryStream(vin=...) constructs its own TeslemetryStreamVehicle
+        # internally (get_vehicle), which is exactly the construction path
+        # that must stay loop-free.
         stream = make_stream(vin=VIN)
-        TeslemetryStreamVehicle(stream, VIN)
-        return check(label, True)
     except RuntimeError as error:
         return check(label, False, f"raised {error!r}")
+    ok = check(label, True)
+    return check(
+        "the config listener is registered by the time construction returns",
+        len(stream._listeners) == 1,
+        f"listeners {len(stream._listeners)}",
+    ) and ok
 
 
-async def test_lazy_registration_happens_on_first_use(results: list[bool]) -> None:
+async def test_registration_happens_at_construction(results: list[bool]) -> None:
     stream = make_stream()
-    vehicle, _sent = make_vehicle_with_capture(stream)
+    _vehicle, _sent = make_vehicle_with_capture(stream)
 
     results.append(
         check(
-            "no listener is registered at construction",
-            len(stream._listeners) == 0,
-            f"listeners {len(stream._listeners)}",
-        )
-    )
-
-    await vehicle.add_field("BatteryLevel")
-
-    results.append(
-        check(
-            "the internal config listener is registered by the first add_field call",
+            "the internal config listener is registered by construction, before any call",
             len(stream._listeners) == 1,
             f"listeners {len(stream._listeners)}",
         )
@@ -120,10 +126,8 @@ async def test_lazy_registration_happens_on_first_use(results: list[bool]) -> No
 
 async def test_auto_close_after_last_public_listener_removed(results: list[bool]) -> None:
     stream = make_stream()
-    vehicle, _sent = make_vehicle_with_capture(stream)
-
-    # Registers the internal (excluded) listener.
-    await vehicle.add_field("BatteryLevel")
+    # The internal listener registers at construction; no call needed to set it up.
+    _vehicle, _sent = make_vehicle_with_capture(stream)
 
     # A real/public listener on top of the internal one.
     remove_public = stream.async_add_listener(lambda event: None)
@@ -226,7 +230,7 @@ async def test_connected_and_subscribed_record_match_skips(results: list[bool]) 
 
 async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
-    await test_lazy_registration_happens_on_first_use(results)
+    await test_registration_happens_at_construction(results)
     await test_auto_close_after_last_public_listener_removed(results)
     await test_cold_stream_add_field_sends_patch_unconditionally(results)
     await test_filtered_config_topic_sends_patch_unconditionally(results)
