@@ -243,6 +243,67 @@ async def test_close_prevents_reconnect_after_backoff(results: list[bool]) -> No
     )
 
 
+async def test_restart_after_public_readd_with_internal_listener_present(
+    results: list[bool],
+) -> None:
+    """An internal (bookkeeping-only) listener surviving auto-close must not
+    block a later public listener from restarting the owned task."""
+    session = FakeSession()
+    stream = make_stream(session)
+
+    # An internal listener alone must not itself start the task - only
+    # public listeners drive connect/disconnect.
+    remove_internal = stream.async_add_listener(lambda event: None, internal=True)
+    results.append(
+        check(
+            "an internal-only listener does not start the owned task",
+            stream._listen_task is None,
+        )
+    )
+
+    remove_public = stream.async_add_listener(lambda event: None)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "adding the first public listener connects",
+            session.calls == 1,
+            f"got {session.calls}",
+        )
+    )
+
+    # Removing the last public listener auto-closes even though the
+    # internal listener remains registered.
+    remove_public()
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "removing the last public listener auto-closes despite the internal listener",
+            not stream.active,
+        )
+    )
+
+    # A later public listener, added while only the internal one remains
+    # registered, must still restart the owned task - this is the bug: the
+    # registry was non-empty (internal listener) so the old whole-registry
+    # emptiness check never saw a zero-to-one transition.
+    remove_public2 = stream.async_add_listener(lambda event: None)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "re-adding a public listener afterwards reconnects",
+            session.calls == 2,
+            f"got {session.calls}",
+        )
+    )
+
+    remove_public2()
+    remove_internal()
+    stream.close()
+    await asyncio.sleep(0)
+
+
 async def main() -> None:
     results: list[bool] = []
     await test_add_remove_readd_before_loop_runs(results)
@@ -250,6 +311,7 @@ async def main() -> None:
     await test_cancel_while_blocked_reading(results)
     await test_close_during_connect(results)
     await test_close_prevents_reconnect_after_backoff(results)
+    await test_restart_after_public_readd_with_internal_listener_present(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")

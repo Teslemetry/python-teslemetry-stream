@@ -154,7 +154,13 @@ class TeslemetryStreamVehicle:
 
         if "fields" in config:
             fields = config["fields"]
-            if isinstance(fields, dict):
+            # Every entry must itself be a dict (e.g. {"interval_seconds": 60}
+            # or {}) - `fields: dict[str, dict[str, int]]` - so a downstream
+            # `self.fields[field].get(...)` (add_field's no-op check) can't
+            # raise AttributeError on a null/scalar entry that snuck in.
+            if isinstance(fields, dict) and all(
+                isinstance(value, dict) for value in fields.values()
+            ):
                 self.fields = fields
             else:
                 LOGGER.warning(

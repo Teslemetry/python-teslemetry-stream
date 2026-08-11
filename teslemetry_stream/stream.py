@@ -374,26 +374,38 @@ class TeslemetryStream:
         :param filters: Filters to apply to the updates.
         :param internal: True for a listener that keeps the client's own
             state fresh (e.g. a vehicle's config-sync listener) rather than
-            serving a consumer callback. Excluded from the "last listener
-            removed" auto-close check, so a bookkeeping-only listener can't
-            pin the connection open forever once every real listener is gone.
+            serving a consumer callback. Excluded from both the "first
+            listener" start check and the "last listener removed" auto-close
+            check - on either side of the registry, only public listeners
+            count - so a bookkeeping-only listener can neither pin the
+            connection open forever nor, by itself, block a later public
+            listener from restarting a closed one.
         :return: Function to remove the listener.
         """
-        schedule_refresh = not self._listeners
+
+        def has_public_listener() -> bool:
+            return any(not is_internal for _, _, is_internal in self._listeners.values())
+
+        # A transition from zero to one *public* listeners, not merely a
+        # non-empty registry - an internal listener surviving a prior
+        # auto-close must not block a later public listener from restarting
+        # the owned task.
+        schedule_refresh = not internal and not has_public_listener()
 
         def remove_listener() -> None:
             """
             Remove update listener.
             """
             self._listeners.pop(remove_listener)
-            if not any(not is_internal for _, _, is_internal in self._listeners.values()):
+            if not has_public_listener():
                 LOGGER.info("Shutting down stream as there are no more listeners")
                 self.close()
 
         self._listeners[remove_listener] = (callback, filters, internal)
 
-        # This is the first listener - start the owned listen task, unless
-        # one is already running or manual mode delegates that to the caller.
+        # This is the first public listener - start the owned listen task,
+        # unless one is already running or manual mode delegates that to the
+        # caller.
         if (
             schedule_refresh
             and not self.manual

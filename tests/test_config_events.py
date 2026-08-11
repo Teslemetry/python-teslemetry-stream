@@ -182,6 +182,43 @@ async def main() -> None:
                 f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}",
             )
         )
+
+        # A field entry that isn't itself a dict (e.g. null) is malformed
+        # shape too, even though the outer "fields" value is a dict - the
+        # whole "fields" piece is rejected, not just the bad entry, so it
+        # can't leave a null in self.fields that later crashes add_field.
+        good_fields = dict(vehicle.fields)
+        handler.messages.clear()
+        stream.config_listener(
+            {
+                "vin": VIN,
+                "config": {"fields": {"CarType": {}, "BatteryLevel": None}},
+            }
+        )
+        results.append(
+            check(
+                "a null nested field entry rejects the whole fields piece",
+                vehicle.fields == good_fields
+                and any("malformed" in m.lower() for m in handler.messages),
+                f"fields {vehicle.fields}, warnings {handler.messages}",
+            )
+        )
+
+        # And, concretely, a later add_field for an unrelated field must not
+        # raise trying to .get() off the (rejected, never-stored) null entry.
+        try:
+            await vehicle.add_field("BatteryLevel", 60)
+            add_field_ok = True
+        except AttributeError as error:
+            add_field_ok = False
+            add_field_error = repr(error)
+        results.append(
+            check(
+                "add_field after a rejected null entry does not raise",
+                add_field_ok,
+                "" if add_field_ok else add_field_error,
+            )
+        )
     finally:
         logger.removeHandler(handler)
 
