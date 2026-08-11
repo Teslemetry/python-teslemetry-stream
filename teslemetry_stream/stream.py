@@ -436,7 +436,12 @@ class TeslemetryStream:
         try:
             async for event in self:
                 if event:
-                    for listener, filters, _internal in self._listeners.values():
+                    # A snapshot, not a live view - a callback that creates a
+                    # vehicle (get_vehicle) or otherwise adds a listener
+                    # mid-dispatch must not mutate _listeners while this is
+                    # iterating it, which would raise RuntimeError and kill
+                    # the loop.
+                    for listener, filters, _internal in list(self._listeners.values()):
                         if recursive_match(filters, event):
                             try:
                                 listener(event)

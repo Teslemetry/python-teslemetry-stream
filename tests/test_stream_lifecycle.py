@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import Callable
 from typing import Any
 
 import aiohttp
@@ -37,13 +38,35 @@ class FakeContent:
             self._blocker.set_exception(exc)
 
 
+class FakeEventContent:
+    """Async-iterable response body yielding canned SSE `data:` lines, then
+    blocking until failed or cancelled (like `FakeContent`)."""
+
+    def __init__(self, lines: list[bytes]) -> None:
+        self._lines = list(lines)
+        self._blocker: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+
+    def __aiter__(self) -> FakeEventContent:
+        return self
+
+    async def __anext__(self) -> bytes:
+        if self._lines:
+            return self._lines.pop(0)
+        await self._blocker
+        raise AssertionError("unreachable - blocker only resolves via an exception")
+
+    def fail(self, exc: BaseException) -> None:
+        if not self._blocker.done():
+            self._blocker.set_exception(exc)
+
+
 class FakeResponse:
     """Minimal stand-in for the aiohttp response `connect()` awaits."""
 
-    def __init__(self) -> None:
+    def __init__(self, content: Any = None) -> None:
         self.url = "https://fake.teslemetry.com/sse"
         self.status = 200
-        self.content = FakeContent()
+        self.content = content if content is not None else FakeContent()
         self.closed = False
 
     def close(self) -> None:
@@ -57,12 +80,16 @@ class FakeSession:
         self.calls = 0
         self.responses: list[FakeResponse] = []
         self.gate: asyncio.Event | None = None
+        # Overridable factory for the response's `content` - defaults to the
+        # blocks-forever FakeContent when unset.
+        self.content_factory: Callable[[], Any] | None = None
 
     async def get(self, url: str, **kwargs: Any) -> FakeResponse:
         self.calls += 1
         if self.gate is not None:
             await self.gate.wait()
-        response = FakeResponse()
+        content = self.content_factory() if self.content_factory else None
+        response = FakeResponse(content)
         self.responses.append(response)
         return response
 
@@ -304,6 +331,60 @@ async def test_restart_after_public_readd_with_internal_listener_present(
     await asyncio.sleep(0)
 
 
+async def test_dispatch_survives_listener_creating_vehicle_mid_iteration(
+    results: list[bool],
+) -> None:
+    """A callback that calls get_vehicle() for an uncached VIN - or otherwise
+    adds a listener - mid-dispatch inserts into `_listeners` while `listen()`
+    is iterating it. Dispatching over a snapshot means that must not raise
+    and kill the loop; both queued events should still be delivered."""
+    session = FakeSession()
+    session.content_factory = lambda: FakeEventContent(
+        [
+            b'data: {"vin": "A", "state": "online"}\n',
+            b'data: {"vin": "A", "state": "online"}\n',
+        ]
+    )
+    stream = make_stream(session)
+
+    delivered: list[dict[str, Any]] = []
+
+    def mutate_during_dispatch(event: dict[str, Any]) -> None:
+        delivered.append(event)
+        # Registers a new internal listener - a mid-dispatch mutation of
+        # the exact dict listen() is iterating.
+        stream.get_vehicle(f"NEWVIN{len(delivered)}")
+
+    stream.async_add_listener(mutate_during_dispatch, {"vin": None})
+
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    results.append(
+        check(
+            "the listen task survives a listener mutating _listeners mid-dispatch",
+            stream._listen_task is not None and not stream._listen_task.done(),
+        )
+    )
+    results.append(
+        check(
+            "both queued events are delivered - dispatch continues past the mutation",
+            len(delivered) == 2,
+            f"delivered {len(delivered)}",
+        )
+    )
+    results.append(
+        check(
+            "each callback-created vehicle registered its own internal listener",
+            len(stream.vehicles) == 2,
+            f"vehicles {list(stream.vehicles)}",
+        )
+    )
+
+    stream.close()
+    await asyncio.sleep(0)
+
+
 async def main() -> None:
     results: list[bool] = []
     await test_add_remove_readd_before_loop_runs(results)
@@ -312,6 +393,7 @@ async def main() -> None:
     await test_close_during_connect(results)
     await test_close_prevents_reconnect_after_backoff(results)
     await test_restart_after_public_readd_with_internal_listener_present(results)
+    await test_dispatch_survives_listener_creating_vehicle_mid_iteration(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
