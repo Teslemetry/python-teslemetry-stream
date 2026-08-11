@@ -46,6 +46,7 @@ from .const import (
     ShiftState,
     Signal,
     SpeedAssistLevel,
+    SseTopic,
     State,
     Status,
     SunroofInstalledState,
@@ -86,6 +87,16 @@ class TeslemetryStreamVehicle:
         # Callers that arrive while it is running merge into `_config` and
         # await it instead of starting their own PATCH.
         self._flight = None
+        # Registered from birth, not lazily, so no connection can ever
+        # predate this listener and miss a config event. Safe outside a
+        # running loop: `internal=True` makes async_add_listener's
+        # schedule_refresh unconditionally False, so it never reaches the
+        # asyncio.create_task() call that requires one.
+        self.stream.async_add_listener(
+            self._on_config_event,
+            {Key.VIN: self.vin, Key.CONFIG: None},
+            internal=True,
+        )
 
     @property
     def config(self) -> dict[str, Any]:
@@ -114,6 +125,51 @@ class TeslemetryStreamVehicle:
             return
 
         req.raise_for_status()
+
+    def _on_config_event(self, event: dict[str, Any]) -> None:
+        """Sync the record from a server-pushed config event.
+
+        Only well-typed pieces are applied; a bad piece is logged and
+        skipped so it can't corrupt the last-known-good record, and the
+        other piece (if well-typed) still applies.
+        """
+        config = event.get(Key.CONFIG)
+        if not isinstance(config, dict):
+            LOGGER.warning(
+                "Ignoring malformed config event for %s: %r", self.vin, config
+            )
+            return
+
+        if "fields" in config:
+            fields = config["fields"]
+            # Every entry must itself be a dict (e.g. {"interval_seconds": 60}
+            # or {}) - `fields: dict[str, dict[str, int]]` - so a downstream
+            # `self.fields[field].get(...)` (add_field's no-op check) can't
+            # raise AttributeError on a null/scalar entry that snuck in.
+            if isinstance(fields, dict) and all(
+                isinstance(value, dict) for value in fields.values()
+            ):
+                # Copied, not aliased - the event dict is also handed to
+                # public listeners, and a consumer mutating it in place
+                # must not corrupt this record.
+                self.fields = {field: dict(value) for field, value in fields.items()}
+            else:
+                LOGGER.warning(
+                    "Ignoring malformed fields in config event for %s: %r",
+                    self.vin,
+                    fields,
+                )
+
+        if "prefer_typed" in config:
+            prefer_typed = config["prefer_typed"]
+            if isinstance(prefer_typed, bool):
+                self.preferTyped = prefer_typed
+            else:
+                LOGGER.warning(
+                    "Ignoring malformed prefer_typed in config event for %s: %r",
+                    self.vin,
+                    prefer_typed,
+                )
 
     async def update_config(self, config: dict[str, Any]) -> None:
         """Request a configuration update for the vehicle.
@@ -234,8 +290,10 @@ class TeslemetryStreamVehicle:
         if isinstance(field, Signal):
             field = field.value
 
-        if field in self.fields and (
-            interval is None or self.fields[field].get("interval_seconds") == interval
+        if (
+            self._record_is_live()
+            and field in self.fields
+            and (interval is None or self.fields[field].get("interval_seconds") == interval)
         ):
             LOGGER.debug(
                 "Streaming field %s already enabled @ %ss",
@@ -249,9 +307,25 @@ class TeslemetryStreamVehicle:
 
     async def prefer_typed(self, prefer_typed: bool) -> None:
         """Set prefer typed."""
-        if self.preferTyped == prefer_typed:
+        if self._record_is_live() and self.preferTyped == prefer_typed:
             return
         await self.update_config({"prefer_typed": prefer_typed})
+
+    def _record_is_live(self) -> bool:
+        """Whether the record is being kept current and can gate the no-op skip.
+
+        The skip is purely an optimization - the server handles a redundant
+        PATCH fine - so this only needs to answer "is the config-sync
+        listener actually able to observe a server-side change right now",
+        not force the record fresh. That requires both a live connection and
+        the `config` topic not being filtered out via `TeslemetryStream
+        (topics=...)`; if either is false, add_field/prefer_typed skip the
+        no-op check and always send, same as the pre-feature status quo.
+        """
+        if not self.stream.connected:
+            return False
+        topics = self.stream.topics
+        return topics is None or SseTopic.CONFIG in topics
 
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""

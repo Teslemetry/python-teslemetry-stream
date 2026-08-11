@@ -29,6 +29,15 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream."""
 
     manual = True
+    # Keeps the record "live" (see _record_is_live) so add_field/prefer_typed's
+    # no-op check runs - these tests exercise that check itself.
+    connected = True
+    topics = None
+
+    def async_add_listener(
+        self, callback: Any, filters: dict[str, Any] | None = None, internal: bool = False
+    ) -> Any:
+        return lambda: None
 
 
 def make_vehicle(vin: str, responses: list[Any]) -> TeslemetryStreamVehicle:

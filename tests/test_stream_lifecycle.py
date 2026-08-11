@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import Callable
 from typing import Any
 
 import aiohttp
 
 from teslemetry_stream.stream import TeslemetryStream
+from teslemetry_stream.vehicle import TeslemetryStreamVehicle
+
+VIN = "TESTVIN0000000001"
 
 
 class FakeContent:
@@ -37,13 +41,35 @@ class FakeContent:
             self._blocker.set_exception(exc)
 
 
+class FakeEventContent:
+    """Async-iterable response body yielding canned SSE `data:` lines, then
+    blocking until failed or cancelled (like `FakeContent`)."""
+
+    def __init__(self, lines: list[bytes]) -> None:
+        self._lines = list(lines)
+        self._blocker: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+
+    def __aiter__(self) -> FakeEventContent:
+        return self
+
+    async def __anext__(self) -> bytes:
+        if self._lines:
+            return self._lines.pop(0)
+        await self._blocker
+        raise AssertionError("unreachable - blocker only resolves via an exception")
+
+    def fail(self, exc: BaseException) -> None:
+        if not self._blocker.done():
+            self._blocker.set_exception(exc)
+
+
 class FakeResponse:
     """Minimal stand-in for the aiohttp response `connect()` awaits."""
 
-    def __init__(self) -> None:
+    def __init__(self, content: Any = None) -> None:
         self.url = "https://fake.teslemetry.com/sse"
         self.status = 200
-        self.content = FakeContent()
+        self.content = content if content is not None else FakeContent()
         self.closed = False
 
     def close(self) -> None:
@@ -57,12 +83,16 @@ class FakeSession:
         self.calls = 0
         self.responses: list[FakeResponse] = []
         self.gate: asyncio.Event | None = None
+        # Overridable factory for the response's `content` - defaults to the
+        # blocks-forever FakeContent when unset.
+        self.content_factory: Callable[[], Any] | None = None
 
     async def get(self, url: str, **kwargs: Any) -> FakeResponse:
         self.calls += 1
         if self.gate is not None:
             await self.gate.wait()
-        response = FakeResponse()
+        content = self.content_factory() if self.content_factory else None
+        response = FakeResponse(content)
         self.responses.append(response)
         return response
 
@@ -243,6 +273,167 @@ async def test_close_prevents_reconnect_after_backoff(results: list[bool]) -> No
     )
 
 
+async def test_restart_after_public_readd_with_internal_listener_present(
+    results: list[bool],
+) -> None:
+    """An internal (bookkeeping-only) listener surviving auto-close must not
+    block a later public listener from restarting the owned task."""
+    session = FakeSession()
+    stream = make_stream(session)
+
+    # An internal listener alone must not itself start the task - only
+    # public listeners drive connect/disconnect.
+    remove_internal = stream.async_add_listener(lambda event: None, internal=True)
+    results.append(
+        check(
+            "an internal-only listener does not start the owned task",
+            stream._listen_task is None,
+        )
+    )
+
+    remove_public = stream.async_add_listener(lambda event: None)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "adding the first public listener connects",
+            session.calls == 1,
+            f"got {session.calls}",
+        )
+    )
+
+    # Removing the last public listener auto-closes even though the
+    # internal listener remains registered.
+    remove_public()
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "removing the last public listener auto-closes despite the internal listener",
+            not stream.active,
+        )
+    )
+
+    # A later public listener, added while only the internal one remains
+    # registered, must still restart the owned task - this is the bug: the
+    # registry was non-empty (internal listener) so the old whole-registry
+    # emptiness check never saw a zero-to-one transition.
+    remove_public2 = stream.async_add_listener(lambda event: None)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    results.append(
+        check(
+            "re-adding a public listener afterwards reconnects",
+            session.calls == 2,
+            f"got {session.calls}",
+        )
+    )
+
+    remove_public2()
+    remove_internal()
+    stream.close()
+    await asyncio.sleep(0)
+
+
+async def test_dispatch_survives_listener_creating_vehicle_mid_iteration(
+    results: list[bool],
+) -> None:
+    """A callback that calls get_vehicle() for an uncached VIN - or otherwise
+    adds a listener - mid-dispatch inserts into `_listeners` while `listen()`
+    is iterating it. Dispatching over a snapshot means that must not raise
+    and kill the loop; both queued events should still be delivered."""
+    session = FakeSession()
+    session.content_factory = lambda: FakeEventContent(
+        [
+            b'data: {"vin": "A", "state": "online"}\n',
+            b'data: {"vin": "A", "state": "online"}\n',
+        ]
+    )
+    stream = make_stream(session)
+
+    delivered: list[dict[str, Any]] = []
+
+    def mutate_during_dispatch(event: dict[str, Any]) -> None:
+        delivered.append(event)
+        # Registers a new internal listener - a mid-dispatch mutation of
+        # the exact dict listen() is iterating.
+        stream.get_vehicle(f"NEWVIN{len(delivered)}")
+
+    stream.async_add_listener(mutate_during_dispatch, {"vin": None})
+
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    results.append(
+        check(
+            "the listen task survives a listener mutating _listeners mid-dispatch",
+            stream._listen_task is not None and not stream._listen_task.done(),
+        )
+    )
+    results.append(
+        check(
+            "both queued events are delivered - dispatch continues past the mutation",
+            len(delivered) == 2,
+            f"delivered {len(delivered)}",
+        )
+    )
+    results.append(
+        check(
+            "each callback-created vehicle registered its own internal listener",
+            len(stream.vehicles) == 2,
+            f"vehicles {list(stream.vehicles)}",
+        )
+    )
+
+    stream.close()
+    await asyncio.sleep(0)
+
+
+async def test_internal_listener_sees_event_before_public_mutator(results: list[bool]) -> None:
+    """A public listener registered BEFORE the internal one - and running
+    first in registration order - must not get a chance to mutate the event
+    in place before the internal (bookkeeping) listener has cached from it.
+    Dispatch order must be internal-first, not registration-order."""
+    session = FakeSession()
+    session.content_factory = lambda: FakeEventContent(
+        [
+            (
+                b'data: {"vin": "'
+                + VIN.encode()
+                + b'", "config": {"fields": '
+                + b'{"BatteryLevel": {"interval_seconds": 60}}, '
+                + b'"prefer_typed": true}}\n'
+            )
+        ]
+    )
+    stream = make_stream(session)
+
+    def public_mutator(event: dict[str, Any]) -> None:
+        # A badly-behaved public consumer mutating its event argument.
+        event["config"]["fields"]["BatteryLevel"]["interval_seconds"] = 999
+        event["config"]["prefer_typed"] = False
+
+    # Registered first (and would run first under registration order) but
+    # is not internal - the internal config listener, registered second
+    # (via vehicle construction below), must still see the event first.
+    stream.async_add_listener(public_mutator)
+    vehicle = TeslemetryStreamVehicle(stream, VIN)
+
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    results.append(
+        check(
+            "the internal listener captured the pristine value, not the public mutation",
+            vehicle.fields.get("BatteryLevel") == {"interval_seconds": 60}
+            and vehicle.preferTyped is True,
+            f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}",
+        )
+    )
+
+    stream.close()
+    await asyncio.sleep(0)
+
+
 async def main() -> None:
     results: list[bool] = []
     await test_add_remove_readd_before_loop_runs(results)
@@ -250,6 +441,9 @@ async def main() -> None:
     await test_cancel_while_blocked_reading(results)
     await test_close_during_connect(results)
     await test_close_prevents_reconnect_after_backoff(results)
+    await test_restart_after_public_readd_with_internal_listener_present(results)
+    await test_dispatch_survives_listener_creating_vehicle_mid_iteration(results)
+    await test_internal_listener_sees_event_before_public_mutator(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")

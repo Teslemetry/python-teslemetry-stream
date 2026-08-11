@@ -21,6 +21,10 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream that just captures listeners."""
 
     manual = True
+    # Keeps the record "live" (see _record_is_live) so add_field's no-op
+    # check short-circuits, matching this test's pre-populated fields.
+    connected = True
+    topics = None
 
     def __init__(self) -> None:
         # maps Signal value -> wrapped listener callback
@@ -30,11 +34,15 @@ class FakeStream:
         self,
         callback: Callable[[dict[str, Any]], None],
         filters: dict[str, Any] | None = None,
+        internal: bool = False,
     ) -> Callable[[], None]:
-        # filters carries {"vin": ..., "data": {Signal: None}} — grab the field
+        # filters carries {"vin": ..., "data": {Signal: None}} — grab the field.
+        # The vehicle's own internal config-sync listener has no "data" key;
+        # it's not under test here, so just ignore it.
         assert filters is not None
-        signal = next(iter(filters["data"]))
-        self.captured[signal] = callback
+        if "data" in filters:
+            signal = next(iter(filters["data"]))
+            self.captured[signal] = callback
         return lambda: None
 
 

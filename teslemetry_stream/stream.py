@@ -66,7 +66,8 @@ class TeslemetryStream:
         else:
             self.topics = None
         self._listeners: dict[
-            Callable[..., Any], tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None]
+            Callable[..., Any],
+            tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None, bool],
         ] = {}
         self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
         self._listen_task: asyncio.Task[None] | None = None
@@ -361,30 +362,50 @@ class TeslemetryStream:
         raise StopAsyncIteration
 
     def async_add_listener(
-        self, callback: Callable[[dict[str, Any]], None], filters: dict[str, Any] | None = None
+        self,
+        callback: Callable[[dict[str, Any]], None],
+        filters: dict[str, Any] | None = None,
+        internal: bool = False,
     ) -> Callable[[], None]:
         """
         Listen for data updates.
 
         :param callback: Callback function to handle updates.
         :param filters: Filters to apply to the updates.
+        :param internal: True for a listener that keeps the client's own
+            state fresh (e.g. a vehicle's config-sync listener) rather than
+            serving a consumer callback. Excluded from both the "first
+            listener" start check and the "last listener removed" auto-close
+            check - on either side of the registry, only public listeners
+            count - so a bookkeeping-only listener can neither pin the
+            connection open forever nor, by itself, block a later public
+            listener from restarting a closed one.
         :return: Function to remove the listener.
         """
-        schedule_refresh = not self._listeners
+
+        def has_public_listener() -> bool:
+            return any(not is_internal for _, _, is_internal in self._listeners.values())
+
+        # A transition from zero to one *public* listeners, not merely a
+        # non-empty registry - an internal listener surviving a prior
+        # auto-close must not block a later public listener from restarting
+        # the owned task.
+        schedule_refresh = not internal and not has_public_listener()
 
         def remove_listener() -> None:
             """
             Remove update listener.
             """
             self._listeners.pop(remove_listener)
-            if not self._listeners:
+            if not has_public_listener():
                 LOGGER.info("Shutting down stream as there are no more listeners")
                 self.close()
 
-        self._listeners[remove_listener] = (callback, filters)
+        self._listeners[remove_listener] = (callback, filters, internal)
 
-        # This is the first listener - start the owned listen task, unless
-        # one is already running or manual mode delegates that to the caller.
+        # This is the first public listener - start the owned listen task,
+        # unless one is already running or manual mode delegates that to the
+        # caller.
         if (
             schedule_refresh
             and not self.manual
@@ -415,7 +436,15 @@ class TeslemetryStream:
         try:
             async for event in self:
                 if event:
-                    for listener, filters in self._listeners.values():
+                    # A snapshot, not a live view - a callback that creates a
+                    # vehicle (get_vehicle) or otherwise adds a listener
+                    # mid-dispatch must not mutate _listeners while this is
+                    # iterating it, which would raise RuntimeError and kill
+                    # the loop. Internal (bookkeeping) listeners go first, so
+                    # one can cache from the pristine event before any public
+                    # callback gets a chance to mutate it in place.
+                    ordered = sorted(self._listeners.values(), key=lambda item: not item[2])
+                    for listener, filters, _internal in ordered:
                         if recursive_match(filters, event):
                             try:
                                 listener(event)
