@@ -30,6 +30,9 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream."""
 
     manual = True
+    # Skips add_field/prefer_typed's disconnected-refresh path - these tests
+    # exercise the write path itself, not the reconnect-refresh behavior.
+    connected = True
 
     def async_add_listener(
         self, callback: Any, filters: dict[str, Any] | None = None, internal: bool = False

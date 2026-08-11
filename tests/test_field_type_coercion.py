@@ -21,6 +21,9 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream that just captures listeners."""
 
     manual = True
+    # Skips add_field's disconnected-refresh path - this test pre-populates
+    # fields directly and asserts no HTTP happens, unrelated to reconnect-refresh.
+    connected = True
 
     def __init__(self) -> None:
         # maps Signal value -> wrapped listener callback

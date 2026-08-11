@@ -26,6 +26,9 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream that captures the config listener."""
 
     manual = True
+    # Skips add_field/prefer_typed's disconnected-refresh path - these tests
+    # exercise the event-driven merge itself, not the reconnect-refresh behavior.
+    connected = True
 
     def __init__(self) -> None:
         self.config_listener: Callable[[dict[str, Any]], None] | None = None

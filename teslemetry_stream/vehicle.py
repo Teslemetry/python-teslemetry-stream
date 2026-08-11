@@ -298,6 +298,7 @@ class TeslemetryStreamVehicle:
     async def add_field(self, field: Signal | str, interval: int | None = None) -> None:
         """Handle vehicle data from the stream."""
         self._ensure_config_listener()
+        await self._refresh_if_disconnected()
         if isinstance(field, Signal):
             field = field.value
 
@@ -317,9 +318,22 @@ class TeslemetryStreamVehicle:
     async def prefer_typed(self, prefer_typed: bool) -> None:
         """Set prefer typed."""
         self._ensure_config_listener()
+        await self._refresh_if_disconnected()
         if self.preferTyped == prefer_typed:
             return
         await self.update_config({"prefer_typed": prefer_typed})
+
+    async def _refresh_if_disconnected(self) -> None:
+        """Refresh the record from the REST API before trusting it for a no-op check.
+
+        The config-sync listener can only observe server-side changes while
+        connected; while disconnected (e.g. every public listener removed
+        and the stream auto-closed) it may be stale, and add_field/
+        prefer_typed's no-op check would wrongly skip a change the server
+        actually needs.
+        """
+        if not self.stream.connected:
+            await self.get_config()
 
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""
