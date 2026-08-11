@@ -23,6 +23,7 @@ class Key(StrEnum):
     ERRORS = "errors"
     VEHICLE_DATA = "vehicle_data"
     STATE = "state"
+    CONFIG = "config"
     STATUS = "status"
     NETWORK_INTERFACE = "networkInterface"
     SITE_ID = "site_id"

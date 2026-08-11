@@ -31,10 +31,13 @@ class FakeStream:
         callback: Callable[[dict[str, Any]], None],
         filters: dict[str, Any] | None = None,
     ) -> Callable[[], None]:
-        # filters carries {"vin": ..., "data": {Signal: None}} — grab the field
+        # filters carries {"vin": ..., "data": {Signal: None}} — grab the field.
+        # The vehicle's own internal config-sync listener has no "data" key;
+        # it's not under test here, so just ignore it.
         assert filters is not None
-        signal = next(iter(filters["data"]))
-        self.captured[signal] = callback
+        if "data" in filters:
+            signal = next(iter(filters["data"]))
+            self.captured[signal] = callback
         return lambda: None
 
 

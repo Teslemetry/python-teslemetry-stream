@@ -30,6 +30,11 @@ class FakeStream:
 
     manual = True
 
+    def async_add_listener(
+        self, callback: Any, filters: dict[str, Any] | None = None
+    ) -> Any:
+        return lambda: None
+
 
 def make_vehicle(vin: str, responses: list[Any]) -> TeslemetryStreamVehicle:
     """Build a vehicle that records payloads and replays canned responses."""

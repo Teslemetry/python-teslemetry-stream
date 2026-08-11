@@ -86,6 +86,13 @@ class TeslemetryStreamVehicle:
         # Callers that arrive while it is running merge into `_config` and
         # await it instead of starting their own PATCH.
         self._flight = None
+        # Keeps `fields`/`preferTyped` current when the server applies a
+        # config change outside this client (another client, the console,
+        # a Teslemetry-side migration), so add_field/prefer_typed's no-op
+        # checks don't act on stale history.
+        self.stream.async_add_listener(
+            self._on_config_event, {Key.VIN: self.vin, Key.CONFIG: None}
+        )
 
     @property
     def config(self) -> dict[str, Any]:
@@ -114,6 +121,42 @@ class TeslemetryStreamVehicle:
             return
 
         req.raise_for_status()
+
+    def _on_config_event(self, event: dict[str, Any]) -> None:
+        """Sync the record from a server-pushed config event.
+
+        Only well-typed pieces are applied; a bad piece is logged and
+        skipped so it can't corrupt the last-known-good record, and the
+        other piece (if well-typed) still applies.
+        """
+        config = event.get(Key.CONFIG)
+        if not isinstance(config, dict):
+            LOGGER.warning(
+                "Ignoring malformed config event for %s: %r", self.vin, config
+            )
+            return
+
+        if "fields" in config:
+            fields = config["fields"]
+            if isinstance(fields, dict):
+                self.fields = fields
+            else:
+                LOGGER.warning(
+                    "Ignoring malformed fields in config event for %s: %r",
+                    self.vin,
+                    fields,
+                )
+
+        if "prefer_typed" in config:
+            prefer_typed = config["prefer_typed"]
+            if isinstance(prefer_typed, bool):
+                self.preferTyped = prefer_typed
+            else:
+                LOGGER.warning(
+                    "Ignoring malformed prefer_typed in config event for %s: %r",
+                    self.vin,
+                    prefer_typed,
+                )
 
     async def update_config(self, config: dict[str, Any]) -> None:
         """Request a configuration update for the vehicle.
