@@ -3,10 +3,12 @@
 The server pushes a ``config`` event (``Key.CONFIG`` / ``SseTopic.CONFIG``)
 shaped like ``{"vin": ..., "config": {"fields": {...}, "prefer_typed": bool}}``,
 mirroring the REST ``get_config`` response body.  ``TeslemetryStreamVehicle``
-registers an internal listener for it at construction so ``fields``/
-``preferTyped`` - and therefore the ``add_field``/``prefer_typed`` no-op
-checks - reflect current server truth rather than only what this client has
-itself requested or observed at connect.
+lazily registers an internal listener for it (on first ``add_field``/
+``prefer_typed``/``update_config`` call, not at construction - see
+``test_config_listener_lifecycle.py`` for why) so ``fields``/``preferTyped``
+- and therefore the ``add_field``/``prefer_typed`` no-op checks - reflect
+current server truth rather than only what this client has itself
+requested or observed at connect.
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ class FakeStream:
         self,
         callback: Callable[[dict[str, Any]], None],
         filters: dict[str, Any] | None = None,
+        internal: bool = False,
     ) -> Callable[[], None]:
         assert filters is not None
         if Key.CONFIG in filters:
@@ -56,10 +59,16 @@ def check(label: str, ok: bool, detail: str = "") -> bool:
 
 
 def make_vehicle() -> tuple[TeslemetryStreamVehicle, FakeStream]:
-    """Build a vehicle that records PATCH payloads instead of sending them."""
+    """Build a vehicle that records PATCH payloads instead of sending them.
+
+    Registration is lazy (see ``test_config_listener_lifecycle.py``), so
+    force it here the same way a real first ``add_field``/``prefer_typed``/
+    ``update_config`` call would, to exercise the merge logic in isolation.
+    """
     stream = FakeStream()
     vehicle = TeslemetryStreamVehicle(stream, VIN)  # type: ignore[arg-type]
     vehicle.sent = []  # type: ignore[attr-defined]
+    vehicle._ensure_config_listener()
 
     async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
         vehicle.sent.append(dict(config))  # type: ignore[attr-defined]

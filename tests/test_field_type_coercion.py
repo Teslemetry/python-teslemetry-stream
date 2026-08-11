@@ -30,6 +30,7 @@ class FakeStream:
         self,
         callback: Callable[[dict[str, Any]], None],
         filters: dict[str, Any] | None = None,
+        internal: bool = False,
     ) -> Callable[[], None]:
         # filters carries {"vin": ..., "data": {Signal: None}} — grab the field.
         # The vehicle's own internal config-sync listener has no "data" key;

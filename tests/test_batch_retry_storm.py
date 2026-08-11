@@ -32,7 +32,7 @@ class FakeStream:
     manual = True
 
     def async_add_listener(
-        self, callback: Any, filters: dict[str, Any] | None = None
+        self, callback: Any, filters: dict[str, Any] | None = None, internal: bool = False
     ) -> Any:
         return lambda: None
 

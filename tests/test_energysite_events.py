@@ -108,7 +108,7 @@ def make_stream() -> TeslemetryStream:
 
 def dispatch(stream: TeslemetryStream, event: dict[str, Any]) -> None:
     """Replicate stream.listen()'s per-event dispatch without a live connection."""
-    for listener, filters in list(stream._listeners.values()):
+    for listener, filters, _internal in list(stream._listeners.values()):
         if recursive_match(filters, event):
             listener(event)
 

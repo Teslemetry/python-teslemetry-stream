@@ -66,7 +66,8 @@ class TeslemetryStream:
         else:
             self.topics = None
         self._listeners: dict[
-            Callable[..., Any], tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None]
+            Callable[..., Any],
+            tuple[Callable[[dict[str, Any]], None], dict[str, Any] | None, bool],
         ] = {}
         self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
         self._listen_task: asyncio.Task[None] | None = None
@@ -361,13 +362,21 @@ class TeslemetryStream:
         raise StopAsyncIteration
 
     def async_add_listener(
-        self, callback: Callable[[dict[str, Any]], None], filters: dict[str, Any] | None = None
+        self,
+        callback: Callable[[dict[str, Any]], None],
+        filters: dict[str, Any] | None = None,
+        internal: bool = False,
     ) -> Callable[[], None]:
         """
         Listen for data updates.
 
         :param callback: Callback function to handle updates.
         :param filters: Filters to apply to the updates.
+        :param internal: True for a listener that keeps the client's own
+            state fresh (e.g. a vehicle's config-sync listener) rather than
+            serving a consumer callback. Excluded from the "last listener
+            removed" auto-close check, so a bookkeeping-only listener can't
+            pin the connection open forever once every real listener is gone.
         :return: Function to remove the listener.
         """
         schedule_refresh = not self._listeners
@@ -377,11 +386,11 @@ class TeslemetryStream:
             Remove update listener.
             """
             self._listeners.pop(remove_listener)
-            if not self._listeners:
+            if not any(not is_internal for _, _, is_internal in self._listeners.values()):
                 LOGGER.info("Shutting down stream as there are no more listeners")
                 self.close()
 
-        self._listeners[remove_listener] = (callback, filters)
+        self._listeners[remove_listener] = (callback, filters, internal)
 
         # This is the first listener - start the owned listen task, unless
         # one is already running or manual mode delegates that to the caller.
@@ -415,7 +424,7 @@ class TeslemetryStream:
         try:
             async for event in self:
                 if event:
-                    for listener, filters in self._listeners.values():
+                    for listener, filters, _internal in self._listeners.values():
                         if recursive_match(filters, event):
                             try:
                                 listener(event)
