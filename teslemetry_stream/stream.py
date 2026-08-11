@@ -440,8 +440,11 @@ class TeslemetryStream:
                     # vehicle (get_vehicle) or otherwise adds a listener
                     # mid-dispatch must not mutate _listeners while this is
                     # iterating it, which would raise RuntimeError and kill
-                    # the loop.
-                    for listener, filters, _internal in list(self._listeners.values()):
+                    # the loop. Internal (bookkeeping) listeners go first, so
+                    # one can cache from the pristine event before any public
+                    # callback gets a chance to mutate it in place.
+                    ordered = sorted(self._listeners.values(), key=lambda item: not item[2])
+                    for listener, filters, _internal in ordered:
                         if recursive_match(filters, event):
                             try:
                                 listener(event)
