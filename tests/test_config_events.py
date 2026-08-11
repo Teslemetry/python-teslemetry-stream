@@ -100,6 +100,30 @@ async def main() -> None:
         )
     )
 
+    # Mutating the event dict after delivery must not corrupt the stored
+    # record - the config-sync listener also hands this same dict to public
+    # listeners, so storing an alias to it would let a consumer's in-place
+    # edit silently corrupt the last-known-good record.
+    aliasing_vehicle, aliasing_stream = make_vehicle()
+    assert aliasing_stream.config_listener is not None
+    delivered_event = {
+        "vin": VIN,
+        "config": {
+            "fields": {"CarType": {"interval_seconds": 60}},
+            "prefer_typed": False,
+        },
+    }
+    aliasing_stream.config_listener(delivered_event)
+    delivered_event["config"]["fields"]["CarType"]["interval_seconds"] = 999
+    delivered_event["config"]["fields"]["Injected"] = {"interval_seconds": 1}
+    results.append(
+        check(
+            "mutating the event dict after delivery does not corrupt the record",
+            aliasing_vehicle.fields == {"CarType": {"interval_seconds": 60}},
+            f"fields {aliasing_vehicle.fields}",
+        )
+    )
+
     # A request that now matches the updated record is skipped - no PATCH sent.
     await vehicle.add_field("BatteryLevel", 60)
     results.append(

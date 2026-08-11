@@ -149,7 +149,10 @@ class TeslemetryStreamVehicle:
             if isinstance(fields, dict) and all(
                 isinstance(value, dict) for value in fields.values()
             ):
-                self.fields = fields
+                # Copied, not aliased - the event dict is also handed to
+                # public listeners, and a consumer mutating it in place
+                # must not corrupt this record.
+                self.fields = {field: dict(value) for field, value in fields.items()}
             else:
                 LOGGER.warning(
                     "Ignoring malformed fields in config event for %s: %r",
