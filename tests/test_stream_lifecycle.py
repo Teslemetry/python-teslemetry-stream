@@ -434,6 +434,84 @@ async def test_internal_listener_sees_event_before_public_mutator(results: list[
     await asyncio.sleep(0)
 
 
+async def test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(
+    results: list[bool],
+) -> None:
+    """A generic public listener that discovers an uncached VIN and calls
+    get_vehicle() while handling that VIN's own config event registers a new
+    internal listener that the current dispatch already snapshotted past -
+    the new vehicle never sees the event that revealed it and stays
+    unpopulated. That's fine: its first field-config call finds itself
+    unpopulated and fetches over REST before deciding, so it still ends up
+    correct rather than seeded from the (already gone) triggering event."""
+    new_vin = "TESTVIN0000000002"
+    session = FakeSession()
+    session.content_factory = lambda: FakeEventContent(
+        [
+            (
+                b'data: {"vin": "'
+                + new_vin.encode()
+                + b'", "config": {"fields": '
+                + b'{"BatteryLevel": {"interval_seconds": 60}}, '
+                + b'"prefer_typed": true}}\n'
+            )
+        ]
+    )
+    stream = make_stream(session)
+
+    discovered: list[TeslemetryStreamVehicle] = []
+
+    def generic_listener(event: dict[str, Any]) -> None:
+        vin = event.get("vin")
+        if vin and vin not in stream.vehicles:
+            discovered.append(stream.get_vehicle(vin))
+
+    stream.async_add_listener(generic_listener, {"vin": None})
+
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    results.append(check("the listener discovered the new vehicle", len(discovered) == 1))
+    if not discovered:
+        return
+    vehicle = discovered[0]
+
+    results.append(
+        check(
+            "the newly discovered vehicle missed the triggering event and stays unpopulated",
+            not vehicle._populated,
+            f"populated {vehicle._populated}",
+        )
+    )
+
+    async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
+        raise AssertionError("should skip: the lazy fetch below reveals a matching record")
+
+    vehicle.patch_config = patch_config  # type: ignore[assignment,method-assign]
+
+    async def get_config() -> None:
+        # Stand in for the REST fetch a real session would serve - reflects
+        # what the missed event actually carried.
+        vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
+        vehicle.preferTyped = True
+        vehicle._populated = True
+
+    vehicle.get_config = get_config  # type: ignore[assignment,method-assign]
+
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "the first field-config call fetches and lands on the correct answer",
+            vehicle._populated
+            and vehicle.fields.get("BatteryLevel") == {"interval_seconds": 60},
+            f"fields {vehicle.fields}",
+        )
+    )
+
+    stream.close()
+    await asyncio.sleep(0)
+
+
 async def main() -> None:
     results: list[bool] = []
     await test_add_remove_readd_before_loop_runs(results)
@@ -444,6 +522,7 @@ async def main() -> None:
     await test_restart_after_public_readd_with_internal_listener_present(results)
     await test_dispatch_survives_listener_creating_vehicle_mid_iteration(results)
     await test_internal_listener_sees_event_before_public_mutator(results)
+    await test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")

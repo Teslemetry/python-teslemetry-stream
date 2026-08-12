@@ -22,33 +22,54 @@ Defects flagged across review of the config-consume feature:
   starts the task" check) - otherwise a permanently-registered internal
   listener would keep ``_listeners`` non-empty forever, and a later public
   listener's own zero-to-one transition couldn't restart a closed stream.
-- The config-sync listener can only observe a server-side change while
-  connected AND the ``config`` topic isn't filtered out via
-  ``TeslemetryStream(topics=...)``. A separate attempt at handling *that*
-  forced a REST refresh before the no-op check whenever disconnected -
-  reverted, since it added a failure path and could storm the API with
-  GETs for a batch of callers. The no-op *skip* is purely an optimization
-  (a redundant PATCH is harmless), so it's gated on the record actually
-  being live-maintained (``_record_is_live()``) rather than
-  force-freshened; otherwise add_field/prefer_typed just send
-  unconditionally, exactly the pre-feature status quo.
+- ``add_field``/``prefer_typed`` no longer gate their no-op skip on
+  connection/topic state (``_record_is_live()``, since removed). Instead
+  they gate on whether the record has ever been ``_populated`` - by a
+  push event or by a REST fetch. An unpopulated record is fetched over
+  REST before the no-op decision is made; a populated one is trusted
+  without hitting the network at all.
 """
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
+from teslemetry_stream.const import Key
 from teslemetry_stream.stream import TeslemetryStream
 from teslemetry_stream.vehicle import TeslemetryStreamVehicle
 
 VIN = "TESTVIN0000000001"
 
 
-class FakeSession:
+class RefusingSession:
     """A session whose get() is never expected to be called in these tests."""
 
     async def get(self, url: str, **kwargs: Any) -> Any:
         raise AssertionError(f"unexpected session.get({url!r}) - these tests must not connect")
+
+
+class FakeConfigResponse:
+    """Minimal stand-in for the aiohttp response get_config() awaits."""
+
+    def __init__(self, status: int, body: dict[str, Any]) -> None:
+        self.status = status
+        self._body = body
+
+    async def json(self) -> dict[str, Any]:
+        return self._body
+
+
+class FetchingSession:
+    """A session that serves a canned config GET and counts calls."""
+
+    def __init__(self, status: int, body: dict[str, Any]) -> None:
+        self.calls = 0
+        self.status = status
+        self.body = body
+
+    async def get(self, url: str, **kwargs: Any) -> FakeConfigResponse:
+        self.calls += 1
+        return FakeConfigResponse(self.status, self.body)
 
 
 def check(label: str, ok: bool, detail: str = "") -> bool:
@@ -56,13 +77,12 @@ def check(label: str, ok: bool, detail: str = "") -> bool:
     return ok
 
 
-def make_stream(**kwargs: Any) -> TeslemetryStream:
+def make_stream(session: Any, **kwargs: Any) -> TeslemetryStream:
     # manual=True: these tests exercise listener bookkeeping, not the real
-    # connect/listen loop - FakeSession.get() intentionally isn't a working
-    # SSE endpoint.
+    # connect/listen loop.
     kwargs.setdefault("manual", True)
     return TeslemetryStream(
-        session=FakeSession(),  # type: ignore[arg-type]
+        session=session,
         access_token="test-token",
         server="api.teslemetry.com",
         **kwargs,
@@ -94,19 +114,30 @@ def test_sync_construction_without_a_loop() -> bool:
         # TeslemetryStream(vin=...) constructs its own TeslemetryStreamVehicle
         # internally (get_vehicle), which is exactly the construction path
         # that must stay loop-free.
-        stream = make_stream(vin=VIN)
+        stream = make_stream(RefusingSession(), vin=VIN)
     except RuntimeError as error:
         return check(label, False, f"raised {error!r}")
     ok = check(label, True)
-    return check(
-        "the config listener is registered by the time construction returns",
-        len(stream._listeners) == 1,
-        f"listeners {len(stream._listeners)}",
-    ) and ok
+    ok = (
+        check(
+            "the config listener is registered by the time construction returns",
+            len(stream._listeners) == 1,
+            f"listeners {len(stream._listeners)}",
+        )
+        and ok
+    )
+    return (
+        check(
+            "the connection listener is registered by the time construction returns",
+            len(stream._connection_listeners) == 1,
+            f"connection listeners {len(stream._connection_listeners)}",
+        )
+        and ok
+    )
 
 
 async def test_registration_happens_at_construction(results: list[bool]) -> None:
-    stream = make_stream()
+    stream = make_stream(RefusingSession())
     _vehicle, _sent = make_vehicle_with_capture(stream)
 
     results.append(
@@ -122,10 +153,17 @@ async def test_registration_happens_at_construction(results: list[bool]) -> None
             all(is_internal for _, _, is_internal in stream._listeners.values()),
         )
     )
+    results.append(
+        check(
+            "the connection listener is registered by construction",
+            len(stream._connection_listeners) == 1,
+            f"connection listeners {len(stream._connection_listeners)}",
+        )
+    )
 
 
 async def test_auto_close_after_last_public_listener_removed(results: list[bool]) -> None:
-    stream = make_stream()
+    stream = make_stream(RefusingSession())
     # The internal listener registers at construction; no call needed to set it up.
     _vehicle, _sent = make_vehicle_with_capture(stream)
 
@@ -158,70 +196,67 @@ async def test_auto_close_after_last_public_listener_removed(results: list[bool]
     )
 
 
-async def test_cold_stream_add_field_sends_patch_unconditionally(results: list[bool]) -> None:
-    """A never-connected (or disconnected) stream can't have observed a
-    server-side change, so the no-op skip must not apply - send the PATCH
-    unconditionally rather than trying to force the record fresh."""
-    stream = make_stream()
+async def test_unpopulated_add_field_fetches_before_deciding(results: list[bool]) -> None:
+    """A vehicle that has never received a config event or a REST fetch must
+    not trust its unset defaults - add_field awaits get_config() first, then
+    decides the no-op skip against the answer it got back."""
+    session = FetchingSession(
+        200, {"fields": {"BatteryLevel": {"interval_seconds": 60}}, "prefer_typed": False}
+    )
+    stream = make_stream(session)
     vehicle, sent = make_vehicle_with_capture(stream)
-    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}  # matches the request below
 
-    results.append(check("the stream starts disconnected", not stream.connected))
+    results.append(check("the vehicle starts unpopulated", not vehicle._populated))
 
+    # Matches what the fetch will reveal - should fetch, then skip.
     await vehicle.add_field("BatteryLevel", 60)
-
+    results.append(check("get_config was fetched exactly once", session.calls == 1))
     results.append(
         check(
-            "add_field sends the PATCH even though the record already matches",
-            len(sent) == 1 and sent[0]["fields"]["BatteryLevel"] == {"interval_seconds": 60},
+            "add_field skips the PATCH once the fetched record matches",
+            sent == [],
+            f"sent {sent}",
+        )
+    )
+    results.append(check("the vehicle is now populated", vehicle._populated))
+
+    # A second call for a field the fetch didn't mention must not re-fetch,
+    # and must send since it doesn't match.
+    await vehicle.add_field("ChargeState")
+    results.append(
+        check("a later call does not re-fetch once populated", session.calls == 1)
+    )
+    results.append(
+        check(
+            "a later call sends when the (now-trusted) record doesn't match",
+            len(sent) == 1 and "ChargeState" in sent[0]["fields"],
             f"sent {sent}",
         )
     )
 
 
-async def test_filtered_config_topic_sends_patch_unconditionally(results: list[bool]) -> None:
-    """Even while connected, if `topics=` filters out the config topic the
-    config-sync listener never receives anything - the record can't be
-    trusted, so the no-op skip must not apply."""
-    stream = make_stream(topics=["state"])
+async def test_populated_add_field_skips_without_fetching(results: list[bool]) -> None:
+    """Once a config event has populated the record, add_field trusts it
+    outright - no REST fetch, matching the pre-feature status quo for the
+    push-driven path."""
+    stream = make_stream(RefusingSession())
     vehicle, sent = make_vehicle_with_capture(stream)
-    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
 
-    stream._response = object()  # type: ignore[assignment]  # simulate a live connection
-    results.append(check("the stream is connected", stream.connected))
+    vehicle._on_config_event(
+        {
+            Key.VIN: VIN,
+            Key.CONFIG: {
+                "fields": {"BatteryLevel": {"interval_seconds": 60}},
+                "prefer_typed": False,
+            },
+        }
+    )
+    results.append(check("the config event populated the vehicle", vehicle._populated))
 
     await vehicle.add_field("BatteryLevel", 60)
-
     results.append(
         check(
-            "add_field sends the PATCH when the config topic is filtered out",
-            len(sent) == 1 and sent[0]["fields"]["BatteryLevel"] == {"interval_seconds": 60},
-            f"sent {sent}",
-        )
-    )
-
-
-async def test_connected_and_subscribed_record_match_skips(results: list[bool]) -> None:
-    """The no-op skip only applies once both conditions hold: connected, and
-    the config topic isn't filtered out (default `topics=None` subscribes
-    to everything)."""
-    stream = make_stream()
-    vehicle, sent = make_vehicle_with_capture(stream)
-    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
-
-    stream._response = object()  # type: ignore[assignment]  # simulate a live connection
-    results.append(
-        check(
-            "the stream is connected and subscribed to every topic",
-            stream.connected and stream.topics is None,
-        )
-    )
-
-    await vehicle.add_field("BatteryLevel", 60)
-
-    results.append(
-        check(
-            "add_field skips the PATCH when the record is live-maintained and matches",
+            "add_field skips the PATCH without ever calling session.get",
             sent == [],
             f"sent {sent}",
         )
@@ -232,9 +267,8 @@ async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
     await test_registration_happens_at_construction(results)
     await test_auto_close_after_last_public_listener_removed(results)
-    await test_cold_stream_add_field_sends_patch_unconditionally(results)
-    await test_filtered_config_topic_sends_patch_unconditionally(results)
-    await test_connected_and_subscribed_record_match_skips(results)
+    await test_unpopulated_add_field_fetches_before_deciding(results)
+    await test_populated_add_field_skips_without_fetching(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")

@@ -21,10 +21,6 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream that just captures listeners."""
 
     manual = True
-    # Keeps the record "live" (see _record_is_live) so add_field's no-op
-    # check short-circuits, matching this test's pre-populated fields.
-    connected = True
-    topics = None
 
     def __init__(self) -> None:
         # maps Signal value -> wrapped listener callback
@@ -45,12 +41,19 @@ class FakeStream:
             self.captured[signal] = callback
         return lambda: None
 
+    def async_add_connection_listener(
+        self, callback: Callable[[bool], None]
+    ) -> Callable[[], None]:
+        return lambda: None
+
 
 def build_vehicle() -> tuple[TeslemetryStreamVehicle, FakeStream]:
     stream = FakeStream()
     vehicle = TeslemetryStreamVehicle(stream, VIN)  # type: ignore[arg-type]
-    # Pre-populate config so _enable_field/add_field short-circuits without HTTP.
+    # Pre-populate config so _enable_field/add_field short-circuits without
+    # a lazy REST fetch (the fake stream has no session to serve one).
     vehicle.fields = {s.value: {} for s in Signal}
+    vehicle._populated = True
     return vehicle, stream
 
 

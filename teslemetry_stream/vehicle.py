@@ -46,7 +46,6 @@ from .const import (
     ShiftState,
     Signal,
     SpeedAssistLevel,
-    SseTopic,
     State,
     Status,
     SunroofInstalledState,
@@ -73,6 +72,8 @@ class TeslemetryStreamVehicle:
     preferTyped: bool | None
     _config: dict[str, Any]
     _flight: asyncio.Task[None] | None
+    _populated: bool
+    _populate_flight: asyncio.Task[None] | None
 
     def __init__(self, stream: TeslemetryStream, vin: str):
         # A dictionary of TelemetryField keys and null values
@@ -83,10 +84,18 @@ class TeslemetryStreamVehicle:
         self.fields = {}
         self.preferTyped = None
         self._config = {}
+        # Whether fields/preferTyped reflect a real server answer (a push
+        # event or a REST fetch) rather than just their unset defaults -
+        # gates add_field/prefer_typed's lazy REST fetch below.
+        self._populated = False
         # The single in-flight (or most recently completed) coalesced flush.
         # Callers that arrive while it is running merge into `_config` and
         # await it instead of starting their own PATCH.
         self._flight = None
+        # The single in-flight populating get_config() call, so a batch of
+        # listeners (e.g. HA integration setup) discovering an unpopulated
+        # vehicle joins one GET instead of each starting its own.
+        self._populate_flight = None
         # Registered from birth, not lazily, so no connection can ever
         # predate this listener and miss a config event. Safe outside a
         # running loop: `internal=True` makes async_add_listener's
@@ -97,6 +106,11 @@ class TeslemetryStreamVehicle:
             {Key.VIN: self.vin, Key.CONFIG: None},
             internal=True,
         )
+        # A disconnect can leave fields/preferTyped stale until the next
+        # connection's config snapshot arrives - unpopulate so a
+        # field-config call landing in that window awaits a fresh fetch
+        # instead of trusting the pre-disconnect record.
+        self.stream.async_add_connection_listener(self._on_connection_event)
 
     @property
     def config(self) -> dict[str, Any]:
@@ -120,11 +134,36 @@ class TeslemetryStreamVehicle:
 
             self.fields = response.get("fields", {})
             self.preferTyped = response.get("prefer_typed", False)
+            self._populated = True
             return
         if req.status == 404:
+            # No config exists for this vehicle yet - an authoritative
+            # answer (empty), not a missing one.
+            self._populated = True
             return
 
         req.raise_for_status()
+
+    def _on_connection_event(self, connected: bool) -> None:
+        """Unpopulate on disconnect - see the __init__ registration comment."""
+        if not connected:
+            self._populated = False
+
+    async def _ensure_populated(self) -> None:
+        """Lazily fetch current config over REST if not yet known.
+
+        Optimistic updates from `_on_config_event` keep the record fresh
+        once established; this only covers the gap before a connection's
+        first snapshot (or after a disconnect) arrives. Concurrent callers
+        join the same fetch rather than each issuing their own GET.
+        """
+        if self._populated:
+            return
+        flight = self._populate_flight
+        if flight is None or flight.done():
+            flight = asyncio.ensure_future(self.get_config())
+            self._populate_flight = flight
+        await asyncio.shield(flight)
 
     def _on_config_event(self, event: dict[str, Any]) -> None:
         """Sync the record from a server-pushed config event.
@@ -139,6 +178,8 @@ class TeslemetryStreamVehicle:
                 "Ignoring malformed config event for %s: %r", self.vin, config
             )
             return
+
+        self._populated = True
 
         if "fields" in config:
             fields = config["fields"]
@@ -290,10 +331,10 @@ class TeslemetryStreamVehicle:
         if isinstance(field, Signal):
             field = field.value
 
-        if (
-            self._record_is_live()
-            and field in self.fields
-            and (interval is None or self.fields[field].get("interval_seconds") == interval)
+        await self._ensure_populated()
+
+        if field in self.fields and (
+            interval is None or self.fields[field].get("interval_seconds") == interval
         ):
             LOGGER.debug(
                 "Streaming field %s already enabled @ %ss",
@@ -307,25 +348,10 @@ class TeslemetryStreamVehicle:
 
     async def prefer_typed(self, prefer_typed: bool) -> None:
         """Set prefer typed."""
-        if self._record_is_live() and self.preferTyped == prefer_typed:
+        await self._ensure_populated()
+        if self.preferTyped == prefer_typed:
             return
         await self.update_config({"prefer_typed": prefer_typed})
-
-    def _record_is_live(self) -> bool:
-        """Whether the record is being kept current and can gate the no-op skip.
-
-        The skip is purely an optimization - the server handles a redundant
-        PATCH fine - so this only needs to answer "is the config-sync
-        listener actually able to observe a server-side change right now",
-        not force the record fresh. That requires both a live connection and
-        the `config` topic not being filtered out via `TeslemetryStream
-        (topics=...)`; if either is false, add_field/prefer_typed skip the
-        no-op check and always send, same as the pre-feature status quo.
-        """
-        if not self.stream.connected:
-            return False
-        topics = self.stream.topics
-        return topics is None or SseTopic.CONFIG in topics
 
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""

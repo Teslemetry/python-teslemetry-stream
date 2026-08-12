@@ -26,10 +26,6 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream that captures the config listener."""
 
     manual = True
-    # Keeps the record "live" (see _record_is_live) so add_field/prefer_typed's
-    # no-op check runs - these tests exercise the event-driven merge itself.
-    connected = True
-    topics = None
 
     def __init__(self) -> None:
         self.config_listener: Callable[[dict[str, Any]], None] | None = None
@@ -43,6 +39,11 @@ class FakeStream:
         assert filters is not None
         if Key.CONFIG in filters:
             self.config_listener = callback
+        return lambda: None
+
+    def async_add_connection_listener(
+        self, callback: Callable[[bool], None]
+    ) -> Callable[[], None]:
         return lambda: None
 
 
