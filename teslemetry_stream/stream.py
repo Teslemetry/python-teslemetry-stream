@@ -224,8 +224,13 @@ class TeslemetryStream:
 
     def _update_connection_listeners(self, value: bool | None = None) -> None:
         """Update all connection listeners with retry count"""
-        for listener in self._connection_listeners.values():
-            listener(self.connected if value is None else value)
+        # A snapshot, not a live view - a callback that creates a vehicle
+        # (get_vehicle) or otherwise adds a connection listener mid-dispatch
+        # must not mutate _connection_listeners while this is iterating it,
+        # which would raise RuntimeError and kill connect()/disconnect.
+        connected = self.connected if value is None else value
+        for listener in list(self._connection_listeners.values()):
+            listener(connected)
 
     async def connect(self) -> None:
         """
