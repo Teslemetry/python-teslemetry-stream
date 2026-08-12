@@ -163,7 +163,17 @@ class TeslemetryStreamVehicle:
         if flight is None or flight.done():
             flight = asyncio.ensure_future(self.get_config())
             self._populate_flight = flight
-        await asyncio.shield(flight)
+        try:
+            await asyncio.shield(flight)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            # Unlike a 404, a failed fetch isn't authoritative - stay
+            # unpopulated and let the caller proceed against whatever
+            # `fields` currently holds, rather than raising into a
+            # fire-and-forget `_enable_field()` task where nobody would
+            # ever see the exception or retry the stranded field request.
+            LOGGER.warning(
+                "Config fetch failed for %s, proceeding without it: %s", self.vin, error
+            )
 
     def _on_config_event(self, event: dict[str, Any]) -> None:
         """Sync the record from a server-pushed config event.

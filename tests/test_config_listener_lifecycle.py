@@ -34,6 +34,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import aiohttp
+
 from teslemetry_stream.const import Key
 from teslemetry_stream.stream import TeslemetryStream
 from teslemetry_stream.vehicle import TeslemetryStreamVehicle
@@ -58,6 +60,20 @@ class FakeConfigResponse:
     async def json(self) -> dict[str, Any]:
         return self._body
 
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            url = "https://fake/api/config"
+            raise aiohttp.ClientResponseError(
+                request_info=aiohttp.RequestInfo(
+                    url=url,  # type: ignore[arg-type]
+                    method="GET",
+                    headers={},  # type: ignore[arg-type]
+                    real_url=url,  # type: ignore[arg-type]
+                ),
+                history=(),
+                status=self.status,
+            )
+
 
 class FetchingSession:
     """A session that serves a canned config GET and counts calls."""
@@ -70,6 +86,17 @@ class FetchingSession:
     async def get(self, url: str, **kwargs: Any) -> FakeConfigResponse:
         self.calls += 1
         return FakeConfigResponse(self.status, self.body)
+
+
+class TransportFailingSession:
+    """A session whose config GET always raises a transport-level error."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def get(self, url: str, **kwargs: Any) -> Any:
+        self.calls += 1
+        raise aiohttp.ClientConnectionError("simulated connection failure")
 
 
 def check(label: str, ok: bool, detail: str = "") -> bool:
@@ -297,6 +324,54 @@ async def test_authoritative_404_clears_stale_fields(results: list[bool]) -> Non
     )
 
 
+async def test_unpopulated_add_field_survives_a_failed_status_fetch(
+    results: list[bool],
+) -> None:
+    """A non-200/404 status on the populating fetch (e.g. a transient 5xx)
+    is not authoritative like a 404 - it must not strand the field request
+    the way it silently would inside a fire-and-forget `_enable_field()`
+    task, where nobody would ever see the raised exception or retry.
+    add_field must stay unpopulated and still send the PATCH."""
+    session = FetchingSession(500, {})
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH despite the failed fetch, not stranding it",
+            len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"sent {sent}",
+        )
+    )
+    results.append(
+        check(
+            "the vehicle stays unpopulated after a failed (non-authoritative) fetch",
+            not vehicle._populated,
+        )
+    )
+
+
+async def test_unpopulated_add_field_survives_a_transport_failure(
+    results: list[bool],
+) -> None:
+    """A transport-level failure (ClientError/timeout) on the populating
+    fetch must be handled the same way as a bad status: proceed to the
+    PATCH rather than stranding the field request."""
+    session = TransportFailingSession()
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH despite a transport failure",
+            len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"sent {sent}",
+        )
+    )
+
+
 async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
     await test_registration_happens_at_construction(results)
@@ -304,6 +379,8 @@ async def main(pre_loop_results: list[bool]) -> None:
     await test_unpopulated_add_field_fetches_before_deciding(results)
     await test_populated_add_field_skips_without_fetching(results)
     await test_authoritative_404_clears_stale_fields(results)
+    await test_unpopulated_add_field_survives_a_failed_status_fetch(results)
+    await test_unpopulated_add_field_survives_a_transport_failure(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
