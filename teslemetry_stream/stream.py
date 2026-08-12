@@ -443,9 +443,22 @@ class TeslemetryStream:
                     # the loop. Internal (bookkeeping) listeners go first, so
                     # one can cache from the pristine event before any public
                     # callback gets a chance to mutate it in place.
+                    dispatched_keys = set(self._listeners.keys())
                     ordered = sorted(self._listeners.values(), key=lambda item: not item[2])
                     for listener, filters, _internal in ordered:
                         if recursive_match(filters, event):
+                            try:
+                                listener(event)
+                            except Exception as error:
+                                LOGGER.error("Uncaught error in listener: %s", error)
+                    # A callback above may have added a listener (e.g.
+                    # get_vehicle() for an uncached VIN registers that
+                    # vehicle's internal config listener) that missed the
+                    # snapshot - give listeners added mid-dispatch one more
+                    # pass at this same event so a newly-created vehicle
+                    # isn't seeded stale.
+                    for key, (listener, filters, _internal) in list(self._listeners.items()):
+                        if key not in dispatched_keys and recursive_match(filters, event):
                             try:
                                 listener(event)
                             except Exception as error:
