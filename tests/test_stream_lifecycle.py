@@ -512,6 +512,51 @@ async def test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(
     await asyncio.sleep(0)
 
 
+async def test_connect_survives_connection_listener_creating_vehicle_mid_dispatch(
+    results: list[bool],
+) -> None:
+    """A connection listener that calls get_vehicle() for an uncached VIN -
+    e.g. an integration reacting to reconnect by discovering a vehicle -
+    registers a new connection listener (TeslemetryStreamVehicle.__init__)
+    while _update_connection_listeners() is iterating _connection_listeners.
+    That must not raise and kill connect()."""
+    session = FakeSession()
+    stream = make_stream(session, manual=True)
+
+    discovered: list[TeslemetryStreamVehicle] = []
+
+    def on_connect(connected: bool) -> None:
+        if connected and not discovered:
+            discovered.append(stream.get_vehicle("NEWVIN1"))
+
+    stream.async_add_connection_listener(on_connect)
+
+    try:
+        await stream.connect()
+        connect_ok = True
+    except RuntimeError as error:
+        connect_ok = False
+        connect_error = repr(error)
+    results.append(
+        check(
+            "connect() survives a connection listener mutating _connection_listeners",
+            connect_ok,
+            "" if connect_ok else connect_error,
+        )
+    )
+    results.append(check("the listener discovered the new vehicle", len(discovered) == 1))
+    results.append(
+        check(
+            "the new vehicle's own connection listener is registered",
+            len(stream._connection_listeners) == 2,
+            f"connection listeners {len(stream._connection_listeners)}",
+        )
+    )
+
+    stream.close()
+    await asyncio.sleep(0)
+
+
 async def main() -> None:
     results: list[bool] = []
     await test_add_remove_readd_before_loop_runs(results)
@@ -523,6 +568,7 @@ async def main() -> None:
     await test_dispatch_survives_listener_creating_vehicle_mid_iteration(results)
     await test_internal_listener_sees_event_before_public_mutator(results)
     await test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(results)
+    await test_connect_survives_connection_listener_creating_vehicle_mid_dispatch(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
