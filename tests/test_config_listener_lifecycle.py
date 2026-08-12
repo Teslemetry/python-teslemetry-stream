@@ -260,12 +260,50 @@ async def test_populated_add_field_skips_without_fetching(results: list[bool]) -
     )
 
 
+async def test_authoritative_404_clears_stale_fields(results: list[bool]) -> None:
+    """A vehicle carrying fields from before a disconnect must not trust them
+    forever if the config was deleted server-side while it was offline - a
+    404 on the reconnect-window fetch is authoritative (no config exists),
+    so it must clear `fields`, not just mark the record populated."""
+    session = FetchingSession(404, {})
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    # Simulate a stale record surviving a disconnect: previously populated
+    # with a field the server no longer has, then unpopulated as a real
+    # disconnect would leave it.
+    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
+    vehicle._populated = False
+
+    await vehicle.get_config()
+    results.append(
+        check(
+            "an authoritative 404 clears stale fields, not just marks populated",
+            vehicle.fields == {},
+            f"fields {vehicle.fields}",
+        )
+    )
+
+    # With the stale record cleared, a later add_field for that same field
+    # must send - not skip on a match that no longer exists - and without
+    # re-fetching, since the (now correctly empty) record is populated.
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH instead of no-op'ing against the stale record",
+            session.calls == 1 and len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"calls {session.calls}, sent {sent}",
+        )
+    )
+
+
 async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
     await test_registration_happens_at_construction(results)
     await test_auto_close_after_last_public_listener_removed(results)
     await test_unpopulated_add_field_fetches_before_deciding(results)
     await test_populated_add_field_skips_without_fetching(results)
+    await test_authoritative_404_clears_stale_fields(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")

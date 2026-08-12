@@ -134,7 +134,11 @@ class TeslemetryStreamVehicle:
             return
         if req.status == 404:
             # No config exists for this vehicle yet - an authoritative
-            # answer (empty), not a missing one.
+            # answer (empty), not a missing one. Clear any fields left over
+            # from before a disconnect: without this, a config deleted
+            # elsewhere while offline would leave add_field() no-op'ing
+            # forever against a record the server no longer has.
+            self.fields = {}
             self._populated = True
             return
 
