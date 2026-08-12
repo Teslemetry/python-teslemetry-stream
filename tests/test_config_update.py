@@ -29,20 +29,23 @@ class FakeStream:
     """Minimal stand-in for TeslemetryStream."""
 
     manual = True
-    # Keeps the record "live" (see _record_is_live) so add_field/prefer_typed's
-    # no-op check runs - these tests exercise that check itself.
-    connected = True
-    topics = None
 
     def async_add_listener(
         self, callback: Any, filters: dict[str, Any] | None = None, internal: bool = False
     ) -> Any:
         return lambda: None
 
+    def async_add_connection_listener(self, callback: Any) -> Any:
+        return lambda: None
+
 
 def make_vehicle(vin: str, responses: list[Any]) -> TeslemetryStreamVehicle:
     """Build a vehicle that records payloads and replays canned responses."""
     vehicle = TeslemetryStreamVehicle(FakeStream(), vin)  # type: ignore[arg-type]
+    # These tests exercise the no-op check itself, not the lazy-populate
+    # fetch (the fake stream has no REST session to serve one) - mark it
+    # populated like a real connection's config snapshot already would have.
+    vehicle._populated = True
     vehicle.sent = []  # type: ignore[attr-defined]
 
     async def patch_config(config: dict[str, Any]) -> dict[str, Any]:
