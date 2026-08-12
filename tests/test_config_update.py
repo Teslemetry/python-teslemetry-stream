@@ -191,17 +191,6 @@ async def main() -> None:
         )
     )
 
-    # prefer_typed=False must be recorded as False, not coerced to True.
-    vehicle = make_vehicle(VIN_A, [ACCEPTED])
-    await vehicle.prefer_typed(False)
-    results.append(
-        check(
-            "prefer_typed(False) recorded as False",
-            vehicle.preferTyped is False,
-            f"got {vehicle.preferTyped!r}",
-        )
-    )
-
     # Pending config must not be shared between vehicles.
     first = make_vehicle(VIN_A, [FAILED])
     second = make_vehicle(VIN_B, [ACCEPTED])

@@ -1,14 +1,13 @@
 """Config-update SSE events keep the internal config record fresh.
 
 The server pushes a ``config`` event (``Key.CONFIG`` / ``SseTopic.CONFIG``)
-shaped like ``{"vin": ..., "config": {"fields": {...}, "prefer_typed": bool}}``,
-mirroring the REST ``get_config`` response body.  ``TeslemetryStreamVehicle``
-registers an internal listener for it at construction (see
+shaped like ``{"vin": ..., "config": {"fields": {...}}}``, mirroring the REST
+``get_config`` response body.  ``TeslemetryStreamVehicle`` registers an
+internal listener for it at construction (see
 ``test_config_listener_lifecycle.py`` for why that's safe even outside a
-running loop) so ``fields``/``preferTyped`` - and therefore the
-``add_field``/``prefer_typed`` no-op checks - reflect current server truth
-rather than only what this client has itself requested or observed at
-connect.
+running loop) so ``fields`` - and therefore the ``add_field`` no-op check -
+reflects current server truth rather than only what this client has itself
+requested or observed at connect.
 """
 from __future__ import annotations
 
@@ -86,18 +85,14 @@ async def main() -> None:
     stream.config_listener(
         {
             "vin": VIN,
-            "config": {
-                "fields": {"BatteryLevel": {"interval_seconds": 60}},
-                "prefer_typed": True,
-            },
+            "config": {"fields": {"BatteryLevel": {"interval_seconds": 60}}},
         }
     )
     results.append(
         check(
-            "a config event updates fields and prefer_typed",
-            vehicle.fields == {"BatteryLevel": {"interval_seconds": 60}}
-            and vehicle.preferTyped is True,
-            f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}",
+            "a config event updates fields",
+            vehicle.fields == {"BatteryLevel": {"interval_seconds": 60}},
+            f"fields {vehicle.fields}",
         )
     )
 
@@ -109,10 +104,7 @@ async def main() -> None:
     assert aliasing_stream.config_listener is not None
     delivered_event = {
         "vin": VIN,
-        "config": {
-            "fields": {"CarType": {"interval_seconds": 60}},
-            "prefer_typed": False,
-        },
+        "config": {"fields": {"CarType": {"interval_seconds": 60}}},
     }
     aliasing_stream.config_listener(delivered_event)
     delivered_event["config"]["fields"]["CarType"]["interval_seconds"] = 999
@@ -154,15 +146,9 @@ async def main() -> None:
         vehicle, stream = make_vehicle()
         assert stream.config_listener is not None
         stream.config_listener(
-            {
-                "vin": VIN,
-                "config": {
-                    "fields": {"BatteryLevel": {}},
-                    "prefer_typed": False,
-                },
-            }
+            {"vin": VIN, "config": {"fields": {"BatteryLevel": {}}}}
         )
-        good_fields, good_typed = dict(vehicle.fields), vehicle.preferTyped
+        good_fields = dict(vehicle.fields)
 
         # A non-dict "config" body is entirely rejected and logged.
         stream.config_listener({"vin": VIN, "config": "not-a-dict"})
@@ -170,39 +156,31 @@ async def main() -> None:
             check(
                 "a non-dict config event is ignored, logged, and keeps last-good",
                 vehicle.fields == good_fields
-                and vehicle.preferTyped == good_typed
                 and any("malformed" in m.lower() for m in handler.messages),
                 f"fields {vehicle.fields}, warnings {handler.messages}",
             )
         )
 
-        # A partially malformed body applies the well-typed piece and keeps
-        # the last-good value for the malformed piece.
+        # A malformed "fields" piece is rejected and logged, keeping last-good.
         handler.messages.clear()
-        stream.config_listener(
-            {"vin": VIN, "config": {"fields": "not-a-dict", "prefer_typed": True}}
-        )
+        stream.config_listener({"vin": VIN, "config": {"fields": "not-a-dict"}})
         results.append(
             check(
-                "a partial config event applies the good field, keeps the bad one",
+                "a malformed fields piece is rejected, keeps last-good",
                 vehicle.fields == good_fields
-                and vehicle.preferTyped is True
                 and any("malformed" in m.lower() for m in handler.messages),
-                f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}, "
-                f"warnings {handler.messages}",
+                f"fields {vehicle.fields}, warnings {handler.messages}",
             )
         )
 
-        # A config event missing a key entirely leaves that piece untouched.
+        # A config event omitting "fields" entirely leaves it unchanged.
         handler.messages.clear()
-        stream.config_listener(
-            {"vin": VIN, "config": {"fields": {"CarType": {}}}}
-        )
+        stream.config_listener({"vin": VIN, "config": {}})
         results.append(
             check(
-                "a config event omitting prefer_typed leaves it unchanged",
-                vehicle.fields == {"CarType": {}} and vehicle.preferTyped is True,
-                f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}",
+                "a config event omitting fields leaves it unchanged",
+                vehicle.fields == good_fields,
+                f"fields {vehicle.fields}",
             )
         )
 

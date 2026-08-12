@@ -6,8 +6,8 @@ Defects flagged across review of the config-consume feature:
   ``TeslemetryStreamVehicle.__init__``, which risked ``TeslemetryStream.
   async_add_listener()`` -> ``asyncio.create_task()`` needing a running
   event loop. That was worked around by deferring registration to first
-  use (inside ``add_field``/``prefer_typed``/``update_config``) - but
-  lazy registration left a gap: a stream that was already connected
+  use (inside ``add_field``/``update_config``) - but lazy registration
+  left a gap: a stream that was already connected
   before the listener existed could have dispatched a config event that
   was simply never seen.
 - The actual fix for the loop hazard was structural, not timing:
@@ -22,17 +22,19 @@ Defects flagged across review of the config-consume feature:
   starts the task" check) - otherwise a permanently-registered internal
   listener would keep ``_listeners`` non-empty forever, and a later public
   listener's own zero-to-one transition couldn't restart a closed stream.
-- ``add_field``/``prefer_typed`` no longer gate their no-op skip on
-  connection/topic state (``_record_is_live()``, since removed). Instead
-  they gate on whether the record has ever been ``_populated`` - by a
-  push event or by a REST fetch. An unpopulated record is fetched over
-  REST before the no-op decision is made; a populated one is trusted
-  without hitting the network at all.
+- ``add_field`` no longer gates its no-op skip on connection/topic state
+  (``_record_is_live()``, since removed). Instead it gates on whether the
+  record has ever been ``_populated`` - by a push event or by a REST
+  fetch. An unpopulated record is fetched over REST before the no-op
+  decision is made; a populated one is trusted without hitting the
+  network at all.
 """
 from __future__ import annotations
 
 import asyncio
 from typing import Any
+
+import aiohttp
 
 from teslemetry_stream.const import Key
 from teslemetry_stream.stream import TeslemetryStream
@@ -58,6 +60,20 @@ class FakeConfigResponse:
     async def json(self) -> dict[str, Any]:
         return self._body
 
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            url = "https://fake/api/config"
+            raise aiohttp.ClientResponseError(
+                request_info=aiohttp.RequestInfo(
+                    url=url,  # type: ignore[arg-type]
+                    method="GET",
+                    headers={},  # type: ignore[arg-type]
+                    real_url=url,  # type: ignore[arg-type]
+                ),
+                history=(),
+                status=self.status,
+            )
+
 
 class FetchingSession:
     """A session that serves a canned config GET and counts calls."""
@@ -70,6 +86,17 @@ class FetchingSession:
     async def get(self, url: str, **kwargs: Any) -> FakeConfigResponse:
         self.calls += 1
         return FakeConfigResponse(self.status, self.body)
+
+
+class TransportFailingSession:
+    """A session whose config GET always raises a transport-level error."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def get(self, url: str, **kwargs: Any) -> Any:
+        self.calls += 1
+        raise aiohttp.ClientConnectionError("simulated connection failure")
 
 
 def check(label: str, ok: bool, detail: str = "") -> bool:
@@ -201,7 +228,7 @@ async def test_unpopulated_add_field_fetches_before_deciding(results: list[bool]
     not trust its unset defaults - add_field awaits get_config() first, then
     decides the no-op skip against the answer it got back."""
     session = FetchingSession(
-        200, {"fields": {"BatteryLevel": {"interval_seconds": 60}}, "prefer_typed": False}
+        200, {"fields": {"BatteryLevel": {"interval_seconds": 60}}}
     )
     stream = make_stream(session)
     vehicle, sent = make_vehicle_with_capture(stream)
@@ -245,10 +272,7 @@ async def test_populated_add_field_skips_without_fetching(results: list[bool]) -
     vehicle._on_config_event(
         {
             Key.VIN: VIN,
-            Key.CONFIG: {
-                "fields": {"BatteryLevel": {"interval_seconds": 60}},
-                "prefer_typed": False,
-            },
+            Key.CONFIG: {"fields": {"BatteryLevel": {"interval_seconds": 60}}},
         }
     )
     results.append(check("the config event populated the vehicle", vehicle._populated))
@@ -263,12 +287,100 @@ async def test_populated_add_field_skips_without_fetching(results: list[bool]) -
     )
 
 
+async def test_authoritative_404_clears_stale_fields(results: list[bool]) -> None:
+    """A vehicle carrying fields from before a disconnect must not trust them
+    forever if the config was deleted server-side while it was offline - a
+    404 on the reconnect-window fetch is authoritative (no config exists),
+    so it must clear `fields`, not just mark the record populated."""
+    session = FetchingSession(404, {})
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    # Simulate a stale record surviving a disconnect: previously populated
+    # with a field the server no longer has, then unpopulated as a real
+    # disconnect would leave it.
+    vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
+    vehicle._populated = False
+
+    await vehicle.get_config()
+    results.append(
+        check(
+            "an authoritative 404 clears stale fields, not just marks populated",
+            vehicle.fields == {},
+            f"fields {vehicle.fields}",
+        )
+    )
+
+    # With the stale record cleared, a later add_field for that same field
+    # must send - not skip on a match that no longer exists - and without
+    # re-fetching, since the (now correctly empty) record is populated.
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH instead of no-op'ing against the stale record",
+            session.calls == 1 and len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"calls {session.calls}, sent {sent}",
+        )
+    )
+
+
+async def test_unpopulated_add_field_survives_a_failed_status_fetch(
+    results: list[bool],
+) -> None:
+    """A non-200/404 status on the populating fetch (e.g. a transient 5xx)
+    is not authoritative like a 404 - it must not strand the field request
+    the way it silently would inside a fire-and-forget `_enable_field()`
+    task, where nobody would ever see the raised exception or retry.
+    add_field must stay unpopulated and still send the PATCH."""
+    session = FetchingSession(500, {})
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH despite the failed fetch, not stranding it",
+            len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"sent {sent}",
+        )
+    )
+    results.append(
+        check(
+            "the vehicle stays unpopulated after a failed (non-authoritative) fetch",
+            not vehicle._populated,
+        )
+    )
+
+
+async def test_unpopulated_add_field_survives_a_transport_failure(
+    results: list[bool],
+) -> None:
+    """A transport-level failure (ClientError/timeout) on the populating
+    fetch must be handled the same way as a bad status: proceed to the
+    PATCH rather than stranding the field request."""
+    session = TransportFailingSession()
+    stream = make_stream(session)
+    vehicle, sent = make_vehicle_with_capture(stream)
+
+    await vehicle.add_field("BatteryLevel", 60)
+    results.append(
+        check(
+            "add_field sends the PATCH despite a transport failure",
+            len(sent) == 1 and "BatteryLevel" in sent[0]["fields"],
+            f"sent {sent}",
+        )
+    )
+
+
 async def main(pre_loop_results: list[bool]) -> None:
     results: list[bool] = list(pre_loop_results)
     await test_registration_happens_at_construction(results)
     await test_auto_close_after_last_public_listener_removed(results)
     await test_unpopulated_add_field_fetches_before_deciding(results)
     await test_populated_add_field_skips_without_fetching(results)
+    await test_authoritative_404_clears_stale_fields(results)
+    await test_unpopulated_add_field_survives_a_failed_status_fetch(results)
+    await test_unpopulated_add_field_survives_a_transport_failure(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
