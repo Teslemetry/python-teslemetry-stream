@@ -2959,7 +2959,13 @@ def make_int(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        callback(event["data"][signal])
+        data = event["data"][signal]
+        if isinstance(data, str):
+            # Some vehicles still stream string-encoded values even with
+            # prefer_typed enabled by default - keep coercing rather than
+            # assuming every vehicle is typed.
+            data = int(data)
+        callback(data)
 
     return typer
 
@@ -2970,7 +2976,13 @@ def make_float(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        callback(event["data"][signal])
+        data = event["data"][signal]
+        if isinstance(data, str):
+            # Some vehicles still stream string-encoded values even with
+            # prefer_typed enabled by default - keep coercing rather than
+            # assuming every vehicle is typed.
+            data = float(data)
+        callback(data)
 
     return typer
 
@@ -2981,7 +2993,13 @@ def make_bool(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        callback(event["data"][signal])
+        data = event["data"][signal]
+        if isinstance(data, str):
+            # Some vehicles still stream string-encoded values even with
+            # prefer_typed enabled by default - keep coercing rather than
+            # assuming every vehicle is typed.
+            data = data == "true"
+        callback(data)
 
     return typer
 
