@@ -20,6 +20,10 @@ class TeslemetryStream:
     """Teslemetry Stream Client"""
 
     _response: aiohttp.ClientResponse | None = None
+    # Bumped each time connect() installs a new response - lets a vehicle
+    # tell "this connection's config snapshot has been applied" apart from
+    # "some past connection's was".
+    _connection_id: int = 0
 
     def __init__(
         self,
@@ -267,6 +271,7 @@ class TeslemetryStream:
             if self._response is not None:
                 self._response.close()
             self._response = response
+            self._connection_id += 1
             LOGGER.debug(
                 "Connected to %s with status %s", self._response.url, self._response.status
             )

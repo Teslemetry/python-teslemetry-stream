@@ -83,6 +83,11 @@ class TeslemetryStreamVehicle:
         self.fields = {}
         self.preferTyped = None
         self._config = {}
+        # The connection id (see TeslemetryStream._connection_id) whose
+        # snapshot this record last reflects - gates _record_is_live so a
+        # reconnect can't be mistaken for "already synced" before its own
+        # config event has actually arrived.
+        self._synced_connection_id = getattr(stream, "_connection_id", 0)
         # The single in-flight (or most recently completed) coalesced flush.
         # Callers that arrive while it is running merge into `_config` and
         # await it instead of starting their own PATCH.
@@ -139,6 +144,8 @@ class TeslemetryStreamVehicle:
                 "Ignoring malformed config event for %s: %r", self.vin, config
             )
             return
+
+        self._synced_connection_id = getattr(self.stream, "_connection_id", 0)
 
         if "fields" in config:
             fields = config["fields"]
@@ -317,12 +324,20 @@ class TeslemetryStreamVehicle:
         The skip is purely an optimization - the server handles a redundant
         PATCH fine - so this only needs to answer "is the config-sync
         listener actually able to observe a server-side change right now",
-        not force the record fresh. That requires both a live connection and
-        the `config` topic not being filtered out via `TeslemetryStream
-        (topics=...)`; if either is false, add_field/prefer_typed skip the
-        no-op check and always send, same as the pre-feature status quo.
+        not force the record fresh. That requires a live connection, the
+        `config` topic not being filtered out via `TeslemetryStream
+        (topics=...)`, AND this connection's own config snapshot having
+        already been applied - `connected` flips true as soon as the
+        response is installed, before that snapshot has been dispatched, so
+        without this last check a listener reacting to reconnect could match
+        against the pre-disconnect record and skip a PATCH that server-side
+        drift actually required. If any of the three is false,
+        add_field/prefer_typed skip the no-op check and always send, same as
+        the pre-feature status quo.
         """
         if not self.stream.connected:
+            return False
+        if getattr(self.stream, "_connection_id", 0) != self._synced_connection_id:
             return False
         topics = self.stream.topics
         return topics is None or SseTopic.CONFIG in topics
