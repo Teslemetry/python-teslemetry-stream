@@ -6,8 +6,8 @@ Defects flagged across review of the config-consume feature:
   ``TeslemetryStreamVehicle.__init__``, which risked ``TeslemetryStream.
   async_add_listener()`` -> ``asyncio.create_task()`` needing a running
   event loop. That was worked around by deferring registration to first
-  use (inside ``add_field``/``prefer_typed``/``update_config``) - but
-  lazy registration left a gap: a stream that was already connected
+  use (inside ``add_field``/``update_config``) - but lazy registration
+  left a gap: a stream that was already connected
   before the listener existed could have dispatched a config event that
   was simply never seen.
 - The actual fix for the loop hazard was structural, not timing:
@@ -22,12 +22,12 @@ Defects flagged across review of the config-consume feature:
   starts the task" check) - otherwise a permanently-registered internal
   listener would keep ``_listeners`` non-empty forever, and a later public
   listener's own zero-to-one transition couldn't restart a closed stream.
-- ``add_field``/``prefer_typed`` no longer gate their no-op skip on
-  connection/topic state (``_record_is_live()``, since removed). Instead
-  they gate on whether the record has ever been ``_populated`` - by a
-  push event or by a REST fetch. An unpopulated record is fetched over
-  REST before the no-op decision is made; a populated one is trusted
-  without hitting the network at all.
+- ``add_field`` no longer gates its no-op skip on connection/topic state
+  (``_record_is_live()``, since removed). Instead it gates on whether the
+  record has ever been ``_populated`` - by a push event or by a REST
+  fetch. An unpopulated record is fetched over REST before the no-op
+  decision is made; a populated one is trusted without hitting the
+  network at all.
 """
 from __future__ import annotations
 
@@ -201,7 +201,7 @@ async def test_unpopulated_add_field_fetches_before_deciding(results: list[bool]
     not trust its unset defaults - add_field awaits get_config() first, then
     decides the no-op skip against the answer it got back."""
     session = FetchingSession(
-        200, {"fields": {"BatteryLevel": {"interval_seconds": 60}}, "prefer_typed": False}
+        200, {"fields": {"BatteryLevel": {"interval_seconds": 60}}}
     )
     stream = make_stream(session)
     vehicle, sent = make_vehicle_with_capture(stream)
@@ -245,10 +245,7 @@ async def test_populated_add_field_skips_without_fetching(results: list[bool]) -
     vehicle._on_config_event(
         {
             Key.VIN: VIN,
-            Key.CONFIG: {
-                "fields": {"BatteryLevel": {"interval_seconds": 60}},
-                "prefer_typed": False,
-            },
+            Key.CONFIG: {"fields": {"BatteryLevel": {"interval_seconds": 60}}},
         }
     )
     results.append(check("the config event populated the vehicle", vehicle._populated))

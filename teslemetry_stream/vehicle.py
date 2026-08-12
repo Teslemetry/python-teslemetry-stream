@@ -69,7 +69,6 @@ class TeslemetryStreamVehicle:
     """Handle streaming field updates."""
 
     fields: dict[str, dict[str, int]]
-    preferTyped: bool | None
     _config: dict[str, Any]
     _flight: asyncio.Task[None] | None
     _populated: bool
@@ -82,11 +81,10 @@ class TeslemetryStreamVehicle:
         self.lock = asyncio.Lock()
         # Per-instance: class-level dicts would share pending config between vehicles
         self.fields = {}
-        self.preferTyped = None
         self._config = {}
-        # Whether fields/preferTyped reflect a real server answer (a push
-        # event or a REST fetch) rather than just their unset defaults -
-        # gates add_field/prefer_typed's lazy REST fetch below.
+        # Whether fields reflects a real server answer (a push event or a
+        # REST fetch) rather than just its unset default - gates add_field's
+        # lazy REST fetch below.
         self._populated = False
         # The single in-flight (or most recently completed) coalesced flush.
         # Callers that arrive while it is running merge into `_config` and
@@ -106,10 +104,10 @@ class TeslemetryStreamVehicle:
             {Key.VIN: self.vin, Key.CONFIG: None},
             internal=True,
         )
-        # A disconnect can leave fields/preferTyped stale until the next
-        # connection's config snapshot arrives - unpopulate so a
-        # field-config call landing in that window awaits a fresh fetch
-        # instead of trusting the pre-disconnect record.
+        # A disconnect can leave fields stale until the next connection's
+        # config snapshot arrives - unpopulate so a field-config call
+        # landing in that window awaits a fresh fetch instead of trusting
+        # the pre-disconnect record.
         self.stream.async_add_connection_listener(self._on_connection_event)
 
     @property
@@ -117,7 +115,6 @@ class TeslemetryStreamVehicle:
         """Return current configuration."""
         return {
             "fields": self.fields,
-            "prefer_typed": self.preferTyped,
         }
 
     async def get_config(self) -> None:
@@ -133,7 +130,6 @@ class TeslemetryStreamVehicle:
             response = await req.json()
 
             self.fields = response.get("fields", {})
-            self.preferTyped = response.get("prefer_typed", False)
             self._populated = True
             return
         if req.status == 404:
@@ -168,9 +164,8 @@ class TeslemetryStreamVehicle:
     def _on_config_event(self, event: dict[str, Any]) -> None:
         """Sync the record from a server-pushed config event.
 
-        Only well-typed pieces are applied; a bad piece is logged and
-        skipped so it can't corrupt the last-known-good record, and the
-        other piece (if well-typed) still applies.
+        A well-typed `fields` piece replaces the record; a malformed one is
+        logged and skipped so it can't corrupt the last-known-good record.
         """
         config = event.get(Key.CONFIG)
         if not isinstance(config, dict):
@@ -199,17 +194,6 @@ class TeslemetryStreamVehicle:
                     "Ignoring malformed fields in config event for %s: %r",
                     self.vin,
                     fields,
-                )
-
-        if "prefer_typed" in config:
-            prefer_typed = config["prefer_typed"]
-            if isinstance(prefer_typed, bool):
-                self.preferTyped = prefer_typed
-            else:
-                LOGGER.warning(
-                    "Ignoring malformed prefer_typed in config event for %s: %r",
-                    self.vin,
-                    prefer_typed,
                 )
 
     async def update_config(self, config: dict[str, Any]) -> None:
@@ -275,10 +259,6 @@ class TeslemetryStreamVehicle:
                 }
                 LOGGER.debug("Configured streaming fields %s", ", ".join(applied))
                 self.fields = {**self.fields, **applied}
-            prefer_typed = self._config.get("prefer_typed")
-            if isinstance(prefer_typed, bool):
-                LOGGER.debug("Configured streaming typed to %s", prefer_typed)
-                self.preferTyped = prefer_typed
             self._config.clear()
 
     async def _patch_with_bounded_retry(
@@ -345,13 +325,6 @@ class TeslemetryStreamVehicle:
 
         value = {"interval_seconds": interval} if interval else None
         await self.update_config({"fields": {field: value}})
-
-    async def prefer_typed(self, prefer_typed: bool) -> None:
-        """Set prefer typed."""
-        await self._ensure_populated()
-        if self.preferTyped == prefer_typed:
-            return
-        await self.update_config({"prefer_typed": prefer_typed})
 
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""
@@ -2972,11 +2945,7 @@ def make_int(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        data = event["data"][signal]
-        if isinstance(data, str):
-            # Handle invalid and None?
-            data = int(data)
-        callback(data)
+        callback(event["data"][signal])
 
     return typer
 
@@ -2987,11 +2956,7 @@ def make_float(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        data = event["data"][signal]
-        if isinstance(data, str):
-            # Handle invalid and None?
-            data = float(data)
-        callback(data)
+        callback(event["data"][signal])
 
     return typer
 
@@ -3002,11 +2967,7 @@ def make_bool(
     """Listener factory"""
 
     def typer(event: dict[str, Any]) -> None:
-        data = event["data"][signal]
-        if isinstance(data, str):
-            # Handle invalid and None?
-            data = data == "true"
-        callback(data)
+        callback(event["data"][signal])
 
     return typer
 

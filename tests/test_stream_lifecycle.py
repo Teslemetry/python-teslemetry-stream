@@ -400,8 +400,7 @@ async def test_internal_listener_sees_event_before_public_mutator(results: list[
                 b'data: {"vin": "'
                 + VIN.encode()
                 + b'", "config": {"fields": '
-                + b'{"BatteryLevel": {"interval_seconds": 60}}, '
-                + b'"prefer_typed": true}}\n'
+                + b'{"BatteryLevel": {"interval_seconds": 60}}}}\n'
             )
         ]
     )
@@ -410,7 +409,6 @@ async def test_internal_listener_sees_event_before_public_mutator(results: list[
     def public_mutator(event: dict[str, Any]) -> None:
         # A badly-behaved public consumer mutating its event argument.
         event["config"]["fields"]["BatteryLevel"]["interval_seconds"] = 999
-        event["config"]["prefer_typed"] = False
 
     # Registered first (and would run first under registration order) but
     # is not internal - the internal config listener, registered second
@@ -424,9 +422,8 @@ async def test_internal_listener_sees_event_before_public_mutator(results: list[
     results.append(
         check(
             "the internal listener captured the pristine value, not the public mutation",
-            vehicle.fields.get("BatteryLevel") == {"interval_seconds": 60}
-            and vehicle.preferTyped is True,
-            f"fields {vehicle.fields}, prefer_typed {vehicle.preferTyped}",
+            vehicle.fields.get("BatteryLevel") == {"interval_seconds": 60},
+            f"fields {vehicle.fields}",
         )
     )
 
@@ -452,8 +449,7 @@ async def test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(
                 b'data: {"vin": "'
                 + new_vin.encode()
                 + b'", "config": {"fields": '
-                + b'{"BatteryLevel": {"interval_seconds": 60}}, '
-                + b'"prefer_typed": true}}\n'
+                + b'{"BatteryLevel": {"interval_seconds": 60}}}}\n'
             )
         ]
     )
@@ -493,7 +489,6 @@ async def test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(
         # Stand in for the REST fetch a real session would serve - reflects
         # what the missed event actually carried.
         vehicle.fields = {"BatteryLevel": {"interval_seconds": 60}}
-        vehicle.preferTyped = True
         vehicle._populated = True
 
     vehicle.get_config = get_config  # type: ignore[assignment,method-assign]

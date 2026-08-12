@@ -113,7 +113,6 @@ async def test_reconnect_window_add_field_refetches_instead_of_trusting_stale_re
     # client yet) - the reconnect's config snapshot will reveal 30s.
     stream._session.config_body = {  # type: ignore[attr-defined]
         "fields": {"BatteryLevel": {"interval_seconds": 30}},
-        "prefer_typed": False,
     }
 
     # A connection listener reacting to reconnect - e.g. an HA integration
