@@ -80,10 +80,10 @@ class TeslemetryStreamEnergySite:
         """Listen for energy_totals refresh notifications.
 
         Unlike live_status/site_info, this event carries no full document -
-        just cumulative totals and the event fires only when the server's
-        5-minute poll actually detects a change. Silence means no change,
-        never staleness; there is no snapshot-on-connect delivery. This
-        listener only exposes the totals.
+        just cumulative totals. The server delivers a connect-time snapshot
+        (`isCache: true`) and otherwise fires only when its periodic poll
+        detects a change; silence between events means no change, never
+        staleness. This listener only exposes the totals.
         """
         return self.stream.async_add_listener(
             lambda x: callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS])),
