@@ -12,6 +12,7 @@ import aiohttp
 
 from .const import (
     BMSState,
+    BuckleStatus,
     CabinOverheatProtectionModeState,
     CableType,
     CarType,
@@ -1301,10 +1302,14 @@ class TeslemetryStreamVehicle:
     def listen_DriverSeatBelt(
         self, callback: Callable[[bool | None], None]
     ) -> Callable[[], None]:
-        """Listen for Driver Seat Belt."""
+        """Listen for Driver Seat Belt.
+
+        True only when the driver seat is occupied and its belt is undone -
+        this is the safety-warning condition, not raw belt state.
+        """
         self._enable_field(Signal.DRIVER_SEAT_BELT)
         return self.stream.async_add_listener(
-            make_bool(Signal.DRIVER_SEAT_BELT, callback),  # BuckleStatus?
+            make_bool(Signal.DRIVER_SEAT_BELT, callback),
             {"vin": self.vin, "data": {Signal.DRIVER_SEAT_BELT: None}},
         )
 
@@ -1946,12 +1951,18 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_PassengerSeatBelt(
-        self, callback: Callable[[bool | None], None]
+        self, callback: Callable[[str | None], None]
     ) -> Callable[[], None]:
-        """Listen for Passenger Seat Belt."""
+        """Listen for Passenger Seat Belt.
+
+        Despite the name, this reports the 2nd row centre belt, not the
+        front passenger belt.
+        """
         self._enable_field(Signal.PASSENGER_SEAT_BELT)
         return self.stream.async_add_listener(
-            make_bool(Signal.PASSENGER_SEAT_BELT, callback),
+            lambda x: callback(
+                BuckleStatus.get(x["data"][Signal.PASSENGER_SEAT_BELT])
+            ),
             {"vin": self.vin, "data": {Signal.PASSENGER_SEAT_BELT: None}},
         )
 

@@ -597,7 +597,7 @@ BMSState = TeslemetryEnum(
 
 # Unused
 BuckleStatus = TeslemetryEnum(
-    "BuckleStatus", ["Unknown", "Unlatched", "Latched", "Faulted"]
+    "BuckleStatus", ["Unknown", "Unlatched", "Latched", "Faulted", "SNA"]
 )
 
 CarType = TeslemetryEnum(
