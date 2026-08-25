@@ -11,7 +11,7 @@ import aiohttp
 
 from .const import CreditsEvent
 from .energysite import TeslemetryStreamEnergySite
-from .exception import TeslemetryStreamEnded
+from .exception import TeslemetryStreamAuthenticationError, TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
 
 LOGGER = logging.getLogger(__package__)
@@ -325,6 +325,8 @@ class TeslemetryStream:
         :return: Next event as a dictionary.
         :raises StopAsyncIteration: If the stream is stopped.
         :raises TeslemetryStreamEnded: If the stream is ended by the server.
+        :raises TeslemetryStreamAuthenticationError: If the access token is
+            rejected with a 401 or 403.
         """
         while self.active:
             try:
@@ -353,6 +355,14 @@ class TeslemetryStream:
                 LOGGER.warning("Stream ended by server")
                 self._close_response()
             except aiohttp.ClientError as error:
+                if isinstance(error, aiohttp.ClientResponseError) and error.status in (401, 403):
+                    # A rejected token is a definitive answer, not a transient
+                    # blip - retrying it can never succeed, and doing so masks
+                    # a bad credential as an indefinitely quiet stream.
+                    LOGGER.error("Authentication failed, not retrying: %s", repr(error))
+                    self.active = False
+                    self._close_response()
+                    raise TeslemetryStreamAuthenticationError() from error
                 LOGGER.warning("Client error: %s", repr(error))
                 self._close_response()
                 delay = min(2**self.retries, 600)
