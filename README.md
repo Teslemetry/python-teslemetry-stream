@@ -249,7 +249,7 @@ Add listener for data updates.
 ### `listen(self)`
 Listen to the telemetry stream.
 
-### `listen_Credits(callback: Callable[[dict[str, str | int]], None]) -> Callable[[], None]`
+### `listen_Credits(callback: Callable[[CreditsEvent], None]) -> Callable[[], None]`
 Add listener for credit events.
 
 ### `listen_Balance(callback: Callable[[int], None]) -> Callable[[], None]`
