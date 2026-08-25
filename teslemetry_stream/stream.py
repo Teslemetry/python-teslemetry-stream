@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import aiohttp
 
+from .const import CreditsEvent
 from .energysite import TeslemetryStreamEnergySite
 from .exception import TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
@@ -462,7 +463,7 @@ class TeslemetryStream:
         LOGGER.debug("Listen has finished")
 
     def listen_Credits(
-        self, callback: Callable[[dict[str, str | int]], None]
+        self, callback: Callable[[CreditsEvent], None]
     ) -> Callable[[], None]:
         """
         Listen for credits update.
@@ -471,7 +472,7 @@ class TeslemetryStream:
         :return: Function to remove the listener.
         """
         return self.async_add_listener(
-            lambda x: callback(x["credits"]), {"credits": None}
+            lambda x: callback(CreditsEvent.from_dict(x["credits"])), {"credits": None}
         )
 
     def listen_Balance(self, callback: Callable[[int], None]) -> Callable[[], None]:

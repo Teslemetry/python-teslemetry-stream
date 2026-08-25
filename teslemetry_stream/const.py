@@ -424,6 +424,33 @@ class EnergyHistoryTotals:
 
 
 @dataclass
+class CreditsEvent:
+    """A credits accounting event.
+
+    `quota` is carried through as the server sends it rather than typed
+    field-by-field - every observed payload has shipped it empty, so there
+    is no evidence yet of what it contains when populated.
+    """
+
+    type: str
+    cost: int
+    name: str
+    balance: int
+    quota: dict[str, Any]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CreditsEvent:
+        """Build from the event's `credits` dict."""
+        return cls(
+            type=data["type"],
+            cost=data["cost"],
+            name=data["name"],
+            balance=data["balance"],
+            quota=data.get("quota", {}),
+        )
+
+
+@dataclass
 class TeslaLocation:
     """Location data"""
 
