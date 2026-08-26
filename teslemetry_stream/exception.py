@@ -23,3 +23,9 @@ class TeslemetryStreamEnded(TeslemetryStreamError):
   """Teslemetry Stream Connection Error"""
 
   message = "The stream was ended by the server."
+
+
+class TeslemetryStreamAuthenticationError(TeslemetryStreamError):
+  """Teslemetry Stream Authentication Error"""
+
+  message = "The access token was rejected (401/403) and will not be retried."

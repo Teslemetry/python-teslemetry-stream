@@ -25,30 +25,30 @@ The TeslemetryStream class requires:
 
 The full list of possible values are provided in `TelemetryFields` and `TelemetryAlerts`
 
-To connect, either use `async with` on the instance, call `connect()`, or register an callback with `async_add_listener`, which will connect when added and disconnect when removed.
+The simplest way to connect is to register a callback with `async_add_listener`: it connects automatically when the first listener is added, and disconnects when the last one is removed - no explicit `connect()`/`close()` call needed.
 
-Using `connect()` or `listen()` will require you to close the session manually using `close()`.
+If you want to manage the connection yourself instead, call `connect()` and drive the stream with `listen()`; in that case you are responsible for calling `close()` when done.
 
 ## Example
 The following example puts the listening loop in the background, then stopping after 20 seconds.
 ```
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with TeslemetryStream(
+        stream = TeslemetryStream(
             access_token="<token>",
             vin="<vin>", # for single vehicles
             server="na.teslemetry.com" # or "eu.teslemetry.com"
             session=session,
-        ) as stream:
+        )
 
-            def callback(event):
-                print(event["data"])
+        def callback(event):
+            print(event["data"])
 
-            remove = stream.async_add_listener(callback)
+        remove = stream.async_add_listener(callback)
 
-            print("Running")
-            await asyncio.sleep(60)
-            remove()
+        print("Running")
+        await asyncio.sleep(60)
+        remove()
 ```
 
 ## Using Typed Listen Methods
@@ -58,27 +58,27 @@ The library provides typed listen methods for various telemetry signals. These m
 ```python
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with TeslemetryStream(
+        stream = TeslemetryStream(
             access_token="<token>",
             vin="<vin>", # for single vehicles
             session=session,
-        ) as stream:
+        )
 
-            vehicle = stream.get_vehicle("<vin>")
+        vehicle = stream.get_vehicle("<vin>")
 
-            def battery_level_callback(battery_level):
-                print(f"Battery Level: {battery_level}")
+        def battery_level_callback(battery_level):
+            print(f"Battery Level: {battery_level}")
 
-            def vehicle_speed_callback(vehicle_speed):
-                print(f"Vehicle Speed: {vehicle_speed}")
+        def vehicle_speed_callback(vehicle_speed):
+            print(f"Vehicle Speed: {vehicle_speed}")
 
-            remove_battery_level_listener = vehicle.listen_BatteryLevel(battery_level_callback)
-            remove_vehicle_speed_listener = vehicle.listen_VehicleSpeed(vehicle_speed_callback)
+        remove_battery_level_listener = vehicle.listen_BatteryLevel(battery_level_callback)
+        remove_vehicle_speed_listener = vehicle.listen_VehicleSpeed(vehicle_speed_callback)
 
-            print("Running")
-            await asyncio.sleep(60)
-            remove_battery_level_listener()
-            remove_vehicle_speed_listener()
+        print("Running")
+        await asyncio.sleep(60)
+        remove_battery_level_listener()
+        remove_vehicle_speed_listener()
 ```
 
 ## Writing Your Own Listener with Multiple Signals
