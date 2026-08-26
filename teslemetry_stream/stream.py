@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import aiohttp
 
-from .const import CreditsEvent
+from .const import CreditsEvent, Key
 from .energysite import TeslemetryStreamEnergySite
 from .exception import TeslemetryStreamAuthenticationError, TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
@@ -339,12 +339,7 @@ class TeslemetryStream:
                     if field == "data":
                         data = json.loads(value)
                         if self.parse_timestamp:
-                            main, _, ns = data["createdAt"].partition(".")
-                            data["timestamp"] = int(
-                                datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
-                                .replace(tzinfo=timezone.utc)
-                                .timestamp()
-                            ) * 1000 + int(ns[:3])
+                            data["timestamp"] = _parse_created_at(data["createdAt"])
                         return cast(dict[str, Any], data)
                 raise TeslemetryStreamEnded()
             except StopAsyncIteration as e:
@@ -452,25 +447,98 @@ class TeslemetryStream:
         try:
             async for event in self:
                 if event:
-                    # A snapshot, not a live view - a callback that creates a
-                    # vehicle (get_vehicle) or otherwise adds a listener
-                    # mid-dispatch must not mutate _listeners while this is
-                    # iterating it, which would raise RuntimeError and kill
-                    # the loop. Internal (bookkeeping) listeners go first, so
-                    # one can cache from the pristine event before any public
-                    # callback gets a chance to mutate it in place.
-                    ordered = sorted(self._listeners.values(), key=lambda item: not item[2])
-                    for listener, filters, _internal in ordered:
-                        if recursive_match(filters, event):
-                            try:
-                                listener(event)
-                            except Exception as error:
-                                LOGGER.error("Uncaught error in listener: %s", error)
+                    self._dispatch(event)
         finally:
             self._close_response()
             if self._listen_task is current_task:
                 self._listen_task = None
         LOGGER.debug("Listen has finished")
+
+    def _dispatch(self, event: dict[str, Any]) -> None:
+        """
+        Fan one event out to every listener whose filters match it.
+
+        Shared by the SSE reader and by `ingest`, so an externally sourced
+        event reaches consumers by the same path a native one does.
+
+        :param event: Event to dispatch.
+        """
+        # A snapshot, not a live view - a callback that creates a vehicle
+        # (get_vehicle) or otherwise adds a listener mid-dispatch must not
+        # mutate _listeners while this is iterating it, which would raise
+        # RuntimeError and kill the loop. Internal (bookkeeping) listeners go
+        # first, so one can cache from the pristine event before any public
+        # callback gets a chance to mutate it in place.
+        ordered = sorted(self._listeners.values(), key=lambda item: not item[2])
+        for listener, filters, _internal in ordered:
+            if recursive_match(filters, event):
+                try:
+                    listener(event)
+                except Exception as error:
+                    LOGGER.error("Uncaught error in listener: %s", error)
+
+    def ingest(
+        self,
+        data: dict[str, Any],
+        vin: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Feed an externally sourced observation into this stream's listeners.
+
+        The event is built in the same wire format the SSE connection
+        delivers - `{"vin": ..., "data": {...}, "createdAt": ...}` - and goes
+        out through the same dispatch, so a consumer's existing `listen_*`
+        callbacks receive it with no translation and no separate
+        subscription. Nothing here connects, reads, or holds a client: the
+        observation is an argument, and ingesting one works whether or not
+        the SSE connection is up.
+
+        Every ingested event is dispatched, in arrival order, exactly as it
+        was given. The stream keeps no per-field value and does not compare
+        an event against what came before, so two sources reporting the same
+        field produce two dispatches - the later one simply arrives later,
+        the way repeated native events already do. There is deliberately no
+        source ranking, precedence, or deduplication: which source to
+        believe is the consumer's call, and `metadata` is what it decides on.
+
+        :param data: Signal payload keyed by signal name, e.g.
+            `{"Locked": True}` or `{"DoorState": {"TrunkFront": False}}`.
+        :param vin: Vehicle Identification Number. Defaults to the stream's
+            own `vin` for a single-vehicle client.
+        :param metadata: Provenance carried alongside the event and never
+            acted on - see `Metadata` for the conventional keys (`source`,
+            `raw`). A dict so it can grow without a format break.
+        :param created_at: Observation time in the stream's own
+            `%Y-%m-%dT%H:%M:%S.%fZ` format. Defaults to now.
+        :return: The event as dispatched.
+        :raises ValueError: If no VIN is available.
+        :raises TypeError: If `data` or `metadata` is not a dict.
+        """
+        vin = vin or self.vin
+        if not vin:
+            raise ValueError("ingest requires a vin, either its own or the stream's")
+        if not isinstance(data, dict):
+            raise TypeError("data must be a dict keyed by signal name")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError("metadata must be a dict")
+
+        event: dict[str, Any] = {
+            # Plain string keys, exactly as a decoded SSE event carries them.
+            Key.VIN.value: vin,
+            # Copied, not aliased - a caller reusing its own payload dict
+            # must not retroactively change an event already dispatched.
+            Key.DATA.value: dict(data),
+            Key.CREATED_AT.value: created_at or _now(),
+            Key.METADATA.value: dict(metadata) if metadata else {},
+        }
+        if self.parse_timestamp:
+            # Before dispatch, so a malformed created_at raises to the caller
+            # instead of half-delivering an event.
+            event["timestamp"] = _parse_created_at(event[Key.CREATED_AT])
+        self._dispatch(event)
+        return event
 
     def listen_Credits(
         self, callback: Callable[[CreditsEvent], None]
@@ -527,3 +595,23 @@ def recursive_match(dict1: dict[str, Any] | None, dict2: dict[str, Any]) -> bool
                 return False
     # No differences found
     return True
+
+
+def _parse_created_at(created_at: str) -> int:
+    """
+    Convert a stream `createdAt` string to epoch milliseconds.
+
+    :param created_at: Timestamp as sent on the wire.
+    :return: Milliseconds since the epoch.
+    """
+    main, _, ns = created_at.partition(".")
+    return int(
+        datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    ) * 1000 + int(ns[:3])
+
+
+def _now() -> str:
+    """Current time in the same format the stream sends `createdAt` in."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

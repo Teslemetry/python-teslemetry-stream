@@ -37,6 +37,22 @@ class Key(StrEnum):
     URL = "url"
     TOTALS = "totals"
     TARIFF_CONTENT_V2 = "tariff_content_v2"
+    METADATA = "metadata"
+
+
+class Metadata(StrEnum):
+    """Conventional keys inside an ingested event's `metadata` dict.
+
+    The dict is open ended by design, so a new key can be added without a
+    format break; these are the ones every source is expected to speak.
+    """
+
+    #: Where the observation came from, e.g. "bluetooth". Provenance is
+    #: recorded so it stays visible, never so the library can rank sources.
+    SOURCE = "source"
+    #: The wire value before any translation, kept because collapsing it to
+    #: the streamed type (e.g. any-unlocked-is-unlocked) discards fidelity.
+    RAW = "raw"
 
 
 class Signal(StrEnum):
