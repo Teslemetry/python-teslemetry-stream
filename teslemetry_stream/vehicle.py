@@ -341,6 +341,22 @@ class TeslemetryStreamVehicle:
         value = {"interval_seconds": interval} if interval else None
         await self.update_config({"fields": {field: value}})
 
+    def ingest(
+        self,
+        data: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Ingest an externally sourced observation for this vehicle.
+
+        A convenience for `TeslemetryStream.ingest` with this vehicle's VIN
+        filled in; see it for the wire format, the metadata dict, and the
+        dispatch rules.
+        """
+        return self.stream.ingest(
+            data, vin=self.vin, metadata=metadata, created_at=created_at
+        )
+
     def _enable_field(self, field: Signal) -> None:
         """Enable a field for streaming from a listener."""
         asyncio.create_task(self.add_field(field))

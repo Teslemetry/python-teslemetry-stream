@@ -6,6 +6,7 @@ This is an asynchronous Python 3 library that connects to the Teslemetry Stream 
 - Listen to various telemetry signals from Tesla vehicles
 - Handle signals using typed listen methods
 - Write custom listeners for multiple signals
+- Ingest observations from other sources into the same listeners
 
 ## Installation
 
@@ -208,6 +209,48 @@ stream = TeslemetryStream(
 `SSE_VEHICLE_TOPICS`, `SSE_ENERGY_TOPICS`, and `SSE_ALL_TOPICS` are
 convenience presets that expand to those exact names client-side.
 
+## Ingesting Externally Sourced Events
+
+Some observations arrive from somewhere other than the SSE connection - a
+Bluetooth broadcast read locally, for instance. `ingest` accepts one and
+delivers it to the listeners you already registered, in the same wire format
+the connection itself sends, so no consumer needs a second subscription or a
+translation step:
+
+```python
+from teslemetry_stream import Metadata, Signal
+
+vehicle = stream.get_vehicle("<vin>")
+vehicle.listen_Locked(print)
+
+vehicle.ingest(
+    {Signal.LOCKED: False},
+    {
+        Metadata.SOURCE: "bluetooth",
+        Metadata.RAW: "VEHICLELOCKSTATE_SELECTIVE_UNLOCKED",
+    },
+)
+```
+
+`metadata` records where the observation came from and what its untranslated
+wire value was. It is carried on the event and never acted on: `source` keeps
+provenance visible for debugging or for a decision the consumer makes, and
+`raw` keeps the fidelity a translation discards (any unlocked state reads as
+unlocked, but which one is still worth having). It is a plain dict, so a
+source can add keys of its own without a format break; `Metadata` names the
+two every source is expected to speak.
+
+Ingesting holds no client and opens no connection, so an observation is
+delivered whether or not the stream is connected.
+
+**Ordering and deduplication.** Every event - native or ingested - is
+dispatched in arrival order, exactly as given. The stream keeps no per-field
+value and compares nothing against what came before, so if two sources report
+the same field, listeners are called twice: once per report, later report
+last, neither dropped. There is deliberately no source ranking, precedence,
+or preferred source. Which report to believe is the consumer's decision, and
+`metadata` is what it decides on.
+
 ## Public Methods in TeslemetryStream Class
 
 ### `__init__(session: aiohttp.ClientSession, access_token: str, server: str | None = None, vin: str | None = None, parse_timestamp: bool = False, manual: bool = False, topics: str | Iterable[str] | None = None)`
@@ -249,6 +292,9 @@ Add listener for data updates.
 ### `listen(self)`
 Listen to the telemetry stream.
 
+### `ingest(data: dict, vin: str | None = None, metadata: dict | None = None, created_at: str | None = None) -> dict`
+Deliver an externally sourced observation to this stream's listeners, in the same wire format the connection sends. `vin` defaults to the stream's own. Returns the event as dispatched. See [Ingesting Externally Sourced Events](#ingesting-externally-sourced-events).
+
 ### `listen_Credits(callback: Callable[[CreditsEvent], None]) -> Callable[[], None]`
 Add listener for credit events.
 
@@ -271,6 +317,9 @@ Replace Fleet Telemetry configuration for the vehicle.
 
 ### `config(self) -> dict`
 Return current configuration for the vehicle.
+
+### `ingest(data: dict, metadata: dict | None = None, created_at: str | None = None) -> dict`
+Ingest an externally sourced observation for this vehicle - `TeslemetryStream.ingest` with the VIN filled in.
 
 ### `listen_State(callback: Callable[[bool], None]) -> Callable[[],None]`
 Listen for vehicle online state polling. The callback receives a boolean value representing whether the vehicle is online.

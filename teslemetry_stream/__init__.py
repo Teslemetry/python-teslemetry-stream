@@ -3,6 +3,7 @@ from .const import (
     SSE_ENERGY_TOPICS,
     SSE_VEHICLE_TOPICS,
     Alert,
+    Metadata,
     Signal,
     SseTopic,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "SSE_ENERGY_TOPICS",
     "SSE_VEHICLE_TOPICS",
     "Alert",
+    "Metadata",
     "Signal",
     "SseTopic",
     "TeslemetryStream",
