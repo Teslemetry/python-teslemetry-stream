@@ -2979,6 +2979,109 @@ class TeslemetryStreamVehicle:
             {"vin": self.vin, "data": {Signal.CHARGE_RATE_MILE_PER_HOUR: None}},
         )
 
+    def listen_GpsAccuracyMeters(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for GPS Accuracy Meters."""
+        self._enable_field(Signal.GPS_ACCURACY_METERS)
+        return self.stream.async_add_listener(
+            make_float(Signal.GPS_ACCURACY_METERS, callback),
+            {"vin": self.vin, "data": {Signal.GPS_ACCURACY_METERS: None}},
+        )
+
+    def listen_LifetimeEnergyChargedKwh(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Lifetime Energy Charged."""
+        self._enable_field(Signal.LIFETIME_ENERGY_CHARGED_KWH)
+        return self.stream.async_add_listener(
+            make_float(Signal.LIFETIME_ENERGY_CHARGED_KWH, callback),
+            {"vin": self.vin, "data": {Signal.LIFETIME_ENERGY_CHARGED_KWH: None}},
+        )
+
+    def listen_BrickSocMinPercent(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Brick State of Charge Minimum Percent."""
+        self._enable_field(Signal.BRICK_SOC_MIN_PERCENT)
+        return self.stream.async_add_listener(
+            make_float(Signal.BRICK_SOC_MIN_PERCENT, callback),
+            {"vin": self.vin, "data": {Signal.BRICK_SOC_MIN_PERCENT: None}},
+        )
+
+    def listen_NominalFullPackEnergyKwh(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Nominal Full Pack Energy."""
+        self._enable_field(Signal.NOMINAL_FULL_PACK_ENERGY_KWH)
+        return self.stream.async_add_listener(
+            make_float(Signal.NOMINAL_FULL_PACK_ENERGY_KWH, callback),
+            {"vin": self.vin, "data": {Signal.NOMINAL_FULL_PACK_ENERGY_KWH: None}},
+        )
+
+    def listen_GradeEstimatePercent(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Grade Estimate Percent."""
+        self._enable_field(Signal.GRADE_ESTIMATE_PERCENT)
+        return self.stream.async_add_listener(
+            make_float(Signal.GRADE_ESTIMATE_PERCENT, callback),
+            {"vin": self.vin, "data": {Signal.GRADE_ESTIMATE_PERCENT: None}},
+        )
+
+    def listen_MaxSpeedToReachDestinationMph(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Max Speed to Reach Destination MPH."""
+        self._enable_field(Signal.MAX_SPEED_TO_REACH_DESTINATION_MPH)
+        return self.stream.async_add_listener(
+            make_float(Signal.MAX_SPEED_TO_REACH_DESTINATION_MPH, callback),
+            {
+                "vin": self.vin,
+                "data": {Signal.MAX_SPEED_TO_REACH_DESTINATION_MPH: None},
+            },
+        )
+
+    def listen_SoftwareUpdateAvailable(
+        self, callback: Callable[[bool | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Software Update Available."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_AVAILABLE)
+        return self.stream.async_add_listener(
+            make_bool(Signal.SOFTWARE_UPDATE_AVAILABLE, callback),
+            {"vin": self.vin, "data": {Signal.SOFTWARE_UPDATE_AVAILABLE: None}},
+        )
+
+    def listen_SoftwareUpdateInProgress(
+        self, callback: Callable[[bool | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Software Update In Progress."""
+        self._enable_field(Signal.SOFTWARE_UPDATE_IN_PROGRESS)
+        return self.stream.async_add_listener(
+            make_bool(Signal.SOFTWARE_UPDATE_IN_PROGRESS, callback),
+            {"vin": self.vin, "data": {Signal.SOFTWARE_UPDATE_IN_PROGRESS: None}},
+        )
+
+    def listen_RemoteStartActive(
+        self, callback: Callable[[bool | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Remote Start Active."""
+        self._enable_field(Signal.REMOTE_START_ACTIVE)
+        return self.stream.async_add_listener(
+            make_bool(Signal.REMOTE_START_ACTIVE, callback),
+            {"vin": self.vin, "data": {Signal.REMOTE_START_ACTIVE: None}},
+        )
+
+    def listen_SemiCruiseSpeedLimitMph(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Semi-truck Cruise Speed Limit MPH."""
+        self._enable_field(Signal.SEMI_CRUISE_SPEED_LIMIT_MPH)
+        return self.stream.async_add_listener(
+            make_float(Signal.SEMI_CRUISE_SPEED_LIMIT_MPH, callback),
+            {"vin": self.vin, "data": {Signal.SEMI_CRUISE_SPEED_LIMIT_MPH: None}},
+        )
+
 
 def make_int(
     signal: Signal, callback: Callable[[int | None], None]
