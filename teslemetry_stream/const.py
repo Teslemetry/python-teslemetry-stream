@@ -575,6 +575,7 @@ DetailedChargeState = TeslemetryEnum(
         "Charging",
         "Complete",
         "Stopped",
+        "Calibrating",
     ],
 )
 
