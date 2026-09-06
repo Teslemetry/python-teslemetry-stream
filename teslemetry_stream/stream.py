@@ -347,7 +347,9 @@ class TeslemetryStream:
                 self.disconnect()
                 raise e
             except TeslemetryStreamEnded:
-                LOGGER.warning("Stream ended by server")
+                # A clean end of the response body is routine (e.g. a server
+                # deploy), not an error - reconnecting is the expected outcome.
+                LOGGER.info("Stream ended by server, reconnecting")
                 self._close_response()
             except aiohttp.ClientError as error:
                 if isinstance(error, aiohttp.ClientResponseError) and error.status in (401, 403):
