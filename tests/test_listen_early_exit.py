@@ -4,7 +4,7 @@ A listen task that fails before ever reaching a connect must not vanish
 quietly: it is the failure mode behind the incident that motivated this -
 a listen task that never logged a single connect attempt for 2.5+ days,
 discoverable only by an absence in server-side logs. Any death before the
-first connect must say so loudly, at ERROR, in the caller's own logs, and
+first connect must say so loudly, at WARNING, in the caller's own logs, and
 must not swallow the underlying exception.
 """
 from __future__ import annotations
@@ -100,13 +100,13 @@ def early_exit_errors(records: list[logging.LogRecord]) -> list[logging.LogRecor
     return [
         r
         for r in records
-        if r.levelno == logging.ERROR and "before its first connect" in r.getMessage()
+        if r.levelno == logging.WARNING and "before its first connect" in r.getMessage()
     ]
 
 
 async def test_cancelled_before_first_connect_logs_error(results: list[bool]) -> None:
     """A stuck connect that is cancelled before it ever succeeds must log
-    ERROR and re-raise the CancelledError - never vanish silently."""
+    WARNING and re-raise the CancelledError - never vanish silently."""
     session = BlockingSession()
     stream = make_stream(session)
 
@@ -120,7 +120,7 @@ async def test_cancelled_before_first_connect_logs_error(results: list[bool]) ->
 
     results.append(
         check(
-            "cancellation before first connect logs at ERROR",
+            "cancellation before first connect logs at WARNING",
             len(early_exit_errors(records)) == 1,
             f"got {early_exit_errors(records)}",
         )
@@ -156,7 +156,7 @@ async def test_auth_failure_before_first_connect_logs_error(results: list[bool])
     )
     results.append(
         check(
-            "the failure before first connect logs at ERROR",
+            "the failure before first connect logs at WARNING",
             len(early_exit_errors(records)) == 1,
             f"got {early_exit_errors(records)}",
         )
