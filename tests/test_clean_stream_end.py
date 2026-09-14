@@ -102,8 +102,11 @@ async def test_clean_end_logs_info_and_reconnects(results: list[bool]) -> None:
         )
 
         session.responses[0].content.end()
-        await asyncio.sleep(0)
-        await asyncio.sleep(0)
+        # asyncio.wait_for's pre-3.12 implementation adds a couple of extra
+        # scheduling hops before a completed read is observable - enough
+        # ticks to cover every supported Python version.
+        for _ in range(6):
+            await asyncio.sleep(0)
 
     results.append(
         check(

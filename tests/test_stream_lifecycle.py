@@ -255,7 +255,11 @@ async def test_close_prevents_reconnect_after_backoff(results: list[bool]) -> No
     results.append(check("initial connect happened", session.calls == 1))
 
     session.responses[0].content.fail(aiohttp.ClientError("boom"))
-    await asyncio.sleep(0)  # let __anext__ observe the error and enter the backoff sleep
+    # asyncio.wait_for's pre-3.12 implementation adds a couple of extra
+    # scheduling hops before a completed read is observable - a handful of
+    # sleep(0) ticks covers every supported Python version.
+    for _ in range(6):
+        await asyncio.sleep(0)
 
     results.append(
         check("the failed response was closed before backoff", session.responses[0].closed)
@@ -360,7 +364,10 @@ async def test_dispatch_survives_listener_creating_vehicle_mid_iteration(
 
     stream.async_add_listener(mutate_during_dispatch, {"vin": None})
 
-    for _ in range(5):
+    # asyncio.wait_for's pre-3.12 implementation adds a couple of extra
+    # scheduling hops before a completed read is observable - enough ticks
+    # to cover every supported Python version.
+    for _ in range(12):
         await asyncio.sleep(0)
 
     results.append(
@@ -416,7 +423,10 @@ async def test_internal_listener_sees_event_before_public_mutator(results: list[
     stream.async_add_listener(public_mutator)
     vehicle = TeslemetryStreamVehicle(stream, VIN)
 
-    for _ in range(5):
+    # asyncio.wait_for's pre-3.12 implementation adds a couple of extra
+    # scheduling hops before a completed read is observable - enough ticks
+    # to cover every supported Python version.
+    for _ in range(12):
         await asyncio.sleep(0)
 
     results.append(
@@ -464,7 +474,10 @@ async def test_vehicle_discovered_mid_dispatch_fetches_correctly_on_first_use(
 
     stream.async_add_listener(generic_listener, {"vin": None})
 
-    for _ in range(5):
+    # asyncio.wait_for's pre-3.12 implementation adds a couple of extra
+    # scheduling hops before a completed read is observable - enough ticks
+    # to cover every supported Python version.
+    for _ in range(12):
         await asyncio.sleep(0)
 
     results.append(check("the listener discovered the new vehicle", len(discovered) == 1))
