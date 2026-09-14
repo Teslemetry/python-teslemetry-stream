@@ -260,7 +260,9 @@ class TeslemetryStream:
                 headers=headers,
                 params=params,
                 raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(connect=5, sock_connect=5, sock_read=30, total=None),
+                timeout=aiohttp.ClientTimeout(
+                    connect=5, sock_connect=5, sock_read=30, total=None
+                ),
                 chunked=True,
             )
             if not self.active:
