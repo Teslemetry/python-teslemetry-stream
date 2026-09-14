@@ -16,6 +16,11 @@ from .vehicle import TeslemetryStreamVehicle
 
 LOGGER = logging.getLogger(__package__)
 
+# The server sends an SSE keepalive comment every 10s. Three missed
+# keepalives (30s of total silence) bounds reconnecting a connection that
+# has gone quiet without erroring.
+_SILENCE_WINDOW = 30.0
+
 
 class TeslemetryStream:
     """Teslemetry Stream Client"""
@@ -72,6 +77,9 @@ class TeslemetryStream:
         ] = {}
         self._connection_listeners: dict[Callable[..., Any], Callable[[bool], None]] = {}
         self._listen_task: asyncio.Task[None] | None = None
+        # Consecutive silence-triggered reconnects with no successful read in
+        # between - gates the WARNING-once/DEBUG-after-that logging split.
+        self._silence_streak: int = 0
         # Created lazily in connect() - asyncio.Lock() requires a running
         # loop on Python 3.9, and streams are commonly built before one.
         self._connect_lock: asyncio.Lock | None = None
@@ -260,8 +268,11 @@ class TeslemetryStream:
                 headers=headers,
                 params=params,
                 raise_for_status=True,
+                # sock_read is intentionally unbounded: the silence watchdog
+                # in __anext__ is the one mechanism that bounds dead air on
+                # an open connection, with logging this bare timeout can't do.
                 timeout=aiohttp.ClientTimeout(
-                    connect=5, sock_connect=5, sock_read=30, total=None
+                    connect=5, sock_connect=5, sock_read=None, total=None
                 ),
                 chunked=True,
             )
@@ -334,14 +345,33 @@ class TeslemetryStream:
                     # Connect to the stream
                     await self.connect()
                 assert self._response
-                async for line_in_bytes in self._response.content:
+                content_iter = self._response.content.__aiter__()
+                while True:
+                    try:
+                        line_in_bytes = await asyncio.wait_for(
+                            content_iter.__anext__(), timeout=_SILENCE_WINDOW
+                        )
+                    except StopAsyncIteration:
+                        raise TeslemetryStreamEnded() from None
+                    except asyncio.TimeoutError:
+                        if self._silence_streak == 0:
+                            LOGGER.warning(
+                                "No data received for %ss, reconnecting", _SILENCE_WINDOW
+                            )
+                        else:
+                            LOGGER.debug(
+                                "No data received for %ss, reconnecting", _SILENCE_WINDOW
+                            )
+                        self._silence_streak += 1
+                        self._close_response()
+                        break
+                    self._silence_streak = 0
                     field, _, value = line_in_bytes.decode("utf8").partition(": ")
                     if field == "data":
                         data = json.loads(value)
                         if self.parse_timestamp:
                             data["timestamp"] = _parse_created_at(data["createdAt"])
                         return cast(dict[str, Any], data)
-                raise TeslemetryStreamEnded()
             except StopAsyncIteration as e:
                 # Re-raise explicitly so it isn't caught by the generic Exception handler below
                 self.disconnect()
@@ -446,11 +476,28 @@ class TeslemetryStream:
             return
 
         self._listen_task = current_task
+        connected_once = False
+
+        def _mark_connected(value: bool) -> None:
+            nonlocal connected_once
+            connected_once = connected_once or value
+
+        remove_connection_listener = self.async_add_connection_listener(_mark_connected)
         try:
-            async for event in self:
-                if event:
-                    self._dispatch(event)
+            try:
+                async for event in self:
+                    if event:
+                        self._dispatch(event)
+            except BaseException as error:
+                if not connected_once:
+                    LOGGER.error(
+                        "Listen task ended before its first connect: %r", error
+                    )
+                raise
+            if not connected_once:
+                LOGGER.error("Listen task ended before its first connect")
         finally:
+            remove_connection_listener()
             self._close_response()
             if self._listen_task is current_task:
                 self._listen_task = None
