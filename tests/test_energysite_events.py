@@ -53,6 +53,27 @@ SITE_INFO_SNAPSHOT: dict[str, Any] = {
     },
 }
 
+LIVE_STATUS_NUMERIC_ID: dict[str, Any] = {
+    **LIVE_STATUS_LIVE,
+    "site_id": int(SITE_A),
+}
+
+SITE_INFO_NUMERIC_ID: dict[str, Any] = {
+    **SITE_INFO_SNAPSHOT,
+    "site_id": int(SITE_A),
+}
+
+TARIFF_CONTENT_V2_EVENT: dict[str, Any] = {
+    "createdAt": "2026-07-28T10:16:00.000Z",
+    "site_id": SITE_A,
+    "tariff_content_v2": {"code": "TOU-1"},
+}
+
+TARIFF_CONTENT_V2_NUMERIC_ID: dict[str, Any] = {
+    **TARIFF_CONTENT_V2_EVENT,
+    "site_id": int(SITE_A),
+}
+
 OTHER_SITE_LIVE_STATUS: dict[str, Any] = {
     "createdAt": "2026-07-28T10:16:00.000Z",
     "site_id": SITE_B,
@@ -92,6 +113,11 @@ ENERGY_TOTALS_EVENT: dict[str, Any] = {
 OTHER_SITE_ENERGY_TOTALS: dict[str, Any] = {
     **ENERGY_TOTALS_EVENT,
     "id": SITE_B,
+}
+
+ENERGY_TOTALS_NUMERIC_ID: dict[str, Any] = {
+    **ENERGY_TOTALS_EVENT,
+    "id": int(SITE_A),
 }
 
 CREDITS_EVENT: dict[str, Any] = {
@@ -248,6 +274,73 @@ def main() -> None:
         check(
             "removing a listener stops further delivery",
             received == [LIVE_STATUS_SNAPSHOT["live_status"]],
+            f"got {received}",
+        )
+    )
+
+    # A numeric site_id (e.g. from a command-patch event) still matches str-typed listeners.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    received = []
+    site.listen_LiveStatus(received.append)
+    dispatch(stream, LIVE_STATUS_NUMERIC_ID)
+    results.append(
+        check(
+            "listen_LiveStatus matches a numeric site_id",
+            received == [LIVE_STATUS_NUMERIC_ID["live_status"]],
+            f"got {received}",
+        )
+    )
+
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    received = []
+    site.listen_SiteInfo(received.append)
+    dispatch(stream, SITE_INFO_NUMERIC_ID)
+    results.append(
+        check(
+            "listen_SiteInfo matches a numeric site_id",
+            received == [SITE_INFO_NUMERIC_ID["site_info"]],
+            f"got {received}",
+        )
+    )
+
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    tariff_received: list[dict[str, Any] | None] = []
+    site.listen_TariffContentV2(tariff_received.append)
+    dispatch(stream, TARIFF_CONTENT_V2_NUMERIC_ID)
+    results.append(
+        check(
+            "listen_TariffContentV2 matches a numeric site_id",
+            tariff_received == [TARIFF_CONTENT_V2_NUMERIC_ID["tariff_content_v2"]],
+            f"got {tariff_received}",
+        )
+    )
+
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    totals_received = []
+    site.listen_EnergyTotals(totals_received.append)
+    dispatch(stream, ENERGY_TOTALS_NUMERIC_ID)
+    results.append(
+        check(
+            "listen_EnergyTotals matches a numeric id",
+            totals_received == [EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE)],
+            f"got {totals_received}",
+        )
+    )
+
+    # A mismatched id (numeric or not) is still filtered out.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    received = []
+    site.listen_LiveStatus(received.append)
+    dispatch(stream, {**LIVE_STATUS_NUMERIC_ID, "site_id": int(SITE_B)})
+    results.append(
+        check(
+            "listen_LiveStatus still filters a mismatched numeric site_id",
+            received == [],
             f"got {received}",
         )
     )

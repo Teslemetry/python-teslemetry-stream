@@ -36,10 +36,11 @@ class TeslemetryStreamEnergySite:
         `isCache` set, matching the same snapshot-then-live semantics as
         vehicle state.
         """
-        return self.stream.async_add_listener(
-            lambda x: callback(x[Key.LIVE_STATUS]),
-            {Key.SITE_ID: self.site_id, Key.LIVE_STATUS: None},
-        )
+        def _handler(x: dict[str, Any]) -> None:
+            if str(x[Key.SITE_ID]) == self.site_id:
+                callback(x[Key.LIVE_STATUS])
+
+        return self.stream.async_add_listener(_handler, {Key.LIVE_STATUS: None})
 
     def listen_SiteInfo(
         self, callback: Callable[[dict[str, Any]], None]
@@ -54,10 +55,11 @@ class TeslemetryStreamEnergySite:
         initial event is delivered with `isCache` set, matching the same
         snapshot-then-live semantics as vehicle state.
         """
-        return self.stream.async_add_listener(
-            lambda x: callback(x[Key.SITE_INFO]),
-            {Key.SITE_ID: self.site_id, Key.SITE_INFO: None},
-        )
+        def _handler(x: dict[str, Any]) -> None:
+            if str(x[Key.SITE_ID]) == self.site_id:
+                callback(x[Key.SITE_INFO])
+
+        return self.stream.async_add_listener(_handler, {Key.SITE_INFO: None})
 
     def listen_TariffContentV2(
         self, callback: Callable[[dict[str, Any] | None], None]
@@ -69,10 +71,11 @@ class TeslemetryStreamEnergySite:
         site's V2 tariff was cleared). Published only when it changes -
         silence means no change, never staleness, matching `listen_SiteInfo`.
         """
-        return self.stream.async_add_listener(
-            lambda x: callback(x[Key.TARIFF_CONTENT_V2]),
-            {Key.SITE_ID: self.site_id, Key.TARIFF_CONTENT_V2: None},
-        )
+        def _handler(x: dict[str, Any]) -> None:
+            if str(x[Key.SITE_ID]) == self.site_id:
+                callback(x[Key.TARIFF_CONTENT_V2])
+
+        return self.stream.async_add_listener(_handler, {Key.TARIFF_CONTENT_V2: None})
 
     def listen_EnergyTotals(
         self, callback: Callable[[EnergyHistoryTotals], None]
@@ -85,10 +88,8 @@ class TeslemetryStreamEnergySite:
         detects a change; silence between events means no change, never
         staleness. This listener only exposes the totals.
         """
-        return self.stream.async_add_listener(
-            lambda x: callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS])),
-            {
-                Key.ID: self.site_id,
-                Key.TOTALS: None,
-            },
-        )
+        def _handler(x: dict[str, Any]) -> None:
+            if str(x[Key.ID]) == self.site_id:
+                callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS]))
+
+        return self.stream.async_add_listener(_handler, {Key.TOTALS: None})
