@@ -22,9 +22,9 @@ class TeslemetryStreamEnergySite:
     here just filter and unwrap the matching topic.
     """
 
-    def __init__(self, stream: TeslemetryStream, site_id: str):
+    def __init__(self, stream: TeslemetryStream, site_id: int):
         self.stream = stream
-        self.site_id = str(site_id)
+        self.site_id = site_id
 
     def listen_LiveStatus(
         self, callback: Callable[[dict[str, Any]], None]
@@ -37,7 +37,7 @@ class TeslemetryStreamEnergySite:
         vehicle state.
         """
         def _handler(x: dict[str, Any]) -> None:
-            if str(x[Key.SITE_ID]) == self.site_id:
+            if int(x[Key.SITE_ID]) == self.site_id:
                 callback(x[Key.LIVE_STATUS])
 
         return self.stream.async_add_listener(_handler, {Key.LIVE_STATUS: None})
@@ -56,7 +56,7 @@ class TeslemetryStreamEnergySite:
         snapshot-then-live semantics as vehicle state.
         """
         def _handler(x: dict[str, Any]) -> None:
-            if str(x[Key.SITE_ID]) == self.site_id:
+            if int(x[Key.SITE_ID]) == self.site_id:
                 callback(x[Key.SITE_INFO])
 
         return self.stream.async_add_listener(_handler, {Key.SITE_INFO: None})
@@ -72,7 +72,7 @@ class TeslemetryStreamEnergySite:
         silence means no change, never staleness, matching `listen_SiteInfo`.
         """
         def _handler(x: dict[str, Any]) -> None:
-            if str(x[Key.SITE_ID]) == self.site_id:
+            if int(x[Key.SITE_ID]) == self.site_id:
                 callback(x[Key.TARIFF_CONTENT_V2])
 
         return self.stream.async_add_listener(_handler, {Key.TARIFF_CONTENT_V2: None})
@@ -89,7 +89,7 @@ class TeslemetryStreamEnergySite:
         staleness. This listener only exposes the totals.
         """
         def _handler(x: dict[str, Any]) -> None:
-            if str(x[Key.ID]) == self.site_id:
+            if int(x[Key.ID]) == self.site_id:
                 callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS]))
 
         return self.stream.async_add_listener(_handler, {Key.TOTALS: None})
