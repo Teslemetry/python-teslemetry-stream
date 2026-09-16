@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime, timezone
+from importlib.metadata import version
 from typing import Any, cast
 
 import aiohttp
@@ -15,6 +16,11 @@ from .exception import TeslemetryStreamAuthenticationError, TeslemetryStreamEnde
 from .vehicle import TeslemetryStreamVehicle
 
 LOGGER = logging.getLogger(__package__)
+
+# The trailing "/<version>" is the api's signal that this client accepts
+# numeric energy-site ids; the bare legacy value "python teslemetry-stream"
+# (no slash) means string-only.
+_LIBRARY_HEADER = f"python teslemetry-stream/{version('teslemetry-stream')}"
 
 
 class TeslemetryStream:
@@ -81,7 +87,7 @@ class TeslemetryStream:
         self.manual = manual
         self.retries: int = 0
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
-        self.energysites: dict[str, TeslemetryStreamEnergySite] = {}
+        self.energysites: dict[int, TeslemetryStreamEnergySite] = {}
         self.fields: dict[str, Any] = {}
 
         if self.vin:
@@ -95,7 +101,7 @@ class TeslemetryStream:
             access_token = self.access_token
         return {
             "Authorization": f"Bearer {access_token}",
-            "X-Library": "python teslemetry-stream",
+            "X-Library": _LIBRARY_HEADER,
         }
 
     def get_vehicle(self, vin: str) -> TeslemetryStreamVehicle:
@@ -113,10 +119,12 @@ class TeslemetryStream:
         """
         Create an energy site stream.
 
-        :param site_id: Numeric energy site ID.
-        :return: TeslemetryStreamEnergySite instance.
+        :param site_id: Numeric energy site ID, as a str or int.
+        :return: TeslemetryStreamEnergySite instance. Its `site_id` is
+            always an int, regardless of which type was passed in here.
+        :raises ValueError: If site_id is not numeric.
         """
-        site_id = str(site_id)
+        site_id = int(site_id)
         if site_id not in self.energysites:
             self.energysites[site_id] = TeslemetryStreamEnergySite(self, site_id)
         return self.energysites[site_id]

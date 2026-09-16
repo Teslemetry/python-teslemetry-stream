@@ -260,7 +260,7 @@ Initialize the TeslemetryStream client. `topics` is an optional exact SSE wire e
 Create a vehicle object to manage config and create listeners.
 
 ### `get_energysite(site_id: str | int) -> TeslemetryStreamEnergySite`
-Create an energy site object to create listeners for `live_status` and `site_info`.
+Create an energy site object to create listeners for `live_status` and `site_info`. Accepts a str or int; the returned object's `site_id` is always normalized to `int`.
 
 ### `connected -> bool`
 Return if connected.
@@ -346,7 +346,7 @@ A full list of fields and metadata can be found at [api.teslemetry.com/fields.js
 
 ## Public Methods in TeslemetryStreamEnergySite Class
 
-### `__init__(stream: TeslemetryStream, site_id: str)`
+### `__init__(stream: TeslemetryStream, site_id: int)`
 Initialize the TeslemetryStreamEnergySite instance.
 
 ### `listen_LiveStatus(callback: Callable[[dict], None]) -> Callable[[],None]`

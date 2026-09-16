@@ -43,6 +43,7 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 - `site_info` does **not** carry `tariff_content`/`tariff_content_v2`. The V2 tariff is its own event/listener (`listen_TariffContentV2`), same envelope shape, with a `None` body meaning explicit server-side removal rather than "not received yet".
 - All of these share a silence-means-no-change contract: the server sends a connect-time snapshot and then fires only on change. Freshness lives in REST, never in event cadence.
 - There is deliberately no helper recombining `site_info` and `tariff_content_v2` - it would only ever cover V2 (legacy V1 `tariff_content` has no SSE topic and stays REST-only). A consumer wanting both tariffs uses the REST site_info endpoint.
+- Site ids are `int` throughout, matching Tesla's own JSON-number representation: `get_energysite(site_id: str | int)` normalises via `int(...)` (raising `ValueError` on a non-numeric id), `TeslemetryStream.energysites` is keyed by int, `TeslemetryStreamEnergySite.site_id` is an int, and every site-id/`Key.ID` comparison in `energysite.py` casts the incoming event value with `int(...)` before comparing - so an event carrying either a string or a number matches. The `X-Library` header's `/<version>` suffix (`stream.py`, read from installed package metadata) is the api's signal that this client accepts numeric ids; the bare legacy value means string-only.
 
 ## Test map
 
@@ -58,8 +59,9 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 | `str` payload coercion against real telemetry | `test_field_type_coercion.py` |
 | `topics` URL construction, empty/bare-string handling, tariff listener | `test_sse_topics.py` |
 | Native-event regression, source indistinguishability, no-dedup contract | `test_external_ingest.py` |
-| Energy event fixtures | `test_energysite_events.py` |
+| Energy event fixtures, int/str site-id matching | `test_energysite_events.py` |
 | Enum tables vs proto names | `test_enum_tables.py` |
+| `X-Library` header version suffix | `test_library_header.py` |
 
 ## Maintaining this file
 
