@@ -3,15 +3,16 @@
 Fixtures mirror the `liveStatusSchema`/`siteInfoSchema` from Teslemetry/api
 PR 310: a flat envelope of `createdAt`, `site_id`, optional `isCache`, and
 the full document under `live_status`/`site_info` (opaque, not a delta).
-`energy_totals` fixtures mirror PR 321's trimmed notification schema:
-`id`/`createdAt`/`totals`, with `isCache` present only when true - no
+`energy_totals` fixtures mirror the api's `energyTotalsNotification` shape:
+`id`/`date`/`createdAt`/`totals`, with `isCache` present only when true - no
 `site_id`, `product_type`, `topic`, or `url` keys.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
-from teslemetry_stream.const import EnergyHistoryTotals
+from teslemetry_stream.const import EnergyHistoryTotals, EnergyTotalsEvent
 from teslemetry_stream.stream import TeslemetryStream, recursive_match
 
 SITE_A = "12345"
@@ -106,8 +107,14 @@ ENERGY_TOTALS_FIXTURE: dict[str, float | None] = {
 
 ENERGY_TOTALS_EVENT: dict[str, Any] = {
     "id": SITE_A,
+    "date": "2026-07-29",
     "createdAt": "2026-07-29T10:16:00.000Z",
     "totals": ENERGY_TOTALS_FIXTURE,
+}
+
+ENERGY_TOTALS_SNAPSHOT: dict[str, Any] = {
+    **ENERGY_TOTALS_EVENT,
+    "isCache": True,
 }
 
 OTHER_SITE_ENERGY_TOTALS: dict[str, Any] = {
@@ -204,16 +211,40 @@ def main() -> None:
         )
     )
 
-    # listen_EnergyTotals receives the parsed totals dataclass.
+    # listen_EnergyTotals receives date, created_at and is_cache alongside the totals.
     stream = make_stream()
     site = stream.get_energysite(SITE_A)
-    totals_received: list[EnergyHistoryTotals] = []
+    totals_received: list[EnergyTotalsEvent] = []
     site.listen_EnergyTotals(totals_received.append)
     dispatch(stream, ENERGY_TOTALS_EVENT)
     results.append(
         check(
             "listen_EnergyTotals parses the totals dict",
-            totals_received == [EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE)],
+            totals_received
+            == [
+                EnergyTotalsEvent(
+                    date="2026-07-29",
+                    created_at=datetime(2026, 7, 29, 10, 16, 0, tzinfo=timezone.utc),
+                    is_cache=False,
+                    totals=EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE),
+                )
+            ],
+            f"got {totals_received}",
+        )
+    )
+
+    # A connect-time snapshot carries is_cache=True; date is passed through unchanged.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    totals_received = []
+    site.listen_EnergyTotals(totals_received.append)
+    dispatch(stream, ENERGY_TOTALS_SNAPSHOT)
+    results.append(
+        check(
+            "listen_EnergyTotals marks a connect-time snapshot with is_cache",
+            len(totals_received) == 1
+            and totals_received[0].is_cache is True
+            and totals_received[0].date == "2026-07-29",
             f"got {totals_received}",
         )
     )
@@ -326,7 +357,15 @@ def main() -> None:
     results.append(
         check(
             "listen_EnergyTotals matches a numeric id",
-            totals_received == [EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE)],
+            totals_received
+            == [
+                EnergyTotalsEvent(
+                    date="2026-07-29",
+                    created_at=datetime(2026, 7, 29, 10, 16, 0, tzinfo=timezone.utc),
+                    is_cache=False,
+                    totals=EnergyHistoryTotals(**ENERGY_TOTALS_FIXTURE),
+                )
+            ],
             f"got {totals_received}",
         )
     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from .const import EnergyHistoryTotals, Key
+from .const import EnergyTotalsEvent, Key
 
 if TYPE_CHECKING:
     from .stream import TeslemetryStream
@@ -78,18 +78,27 @@ class TeslemetryStreamEnergySite:
         return self.stream.async_add_listener(_handler, {Key.TARIFF_CONTENT_V2: None})
 
     def listen_EnergyTotals(
-        self, callback: Callable[[EnergyHistoryTotals], None]
+        self, callback: Callable[[EnergyTotalsEvent], None]
     ) -> Callable[[], None]:
         """Listen for energy_totals refresh notifications.
 
         Unlike live_status/site_info, this event carries no full document -
         just cumulative totals. The server delivers a connect-time snapshot
-        (`isCache: true`) and otherwise fires only when its periodic poll
+        (`is_cache: True`) and otherwise fires only when its periodic poll
         detects a change; silence between events means no change, never
-        staleness. This listener only exposes the totals.
+        staleness. The callback receives an `EnergyTotalsEvent` carrying
+        `date` (the site-local day the totals belong to, verbatim),
+        `created_at`, `is_cache` and the `totals` themselves - a caller
+        deriving Home Assistant's `last_reset` needs `date`, not its own
+        clock, since the server finalises a day's rollover after local
+        midnight.
+
+        Breaking change: previously delivered the bare `EnergyHistoryTotals`
+        as the callback argument; now delivers an `EnergyTotalsEvent`
+        wrapping it under `.totals`.
         """
         def _handler(x: dict[str, Any]) -> None:
             if int(x[Key.ID]) == self.site_id:
-                callback(EnergyHistoryTotals.from_dict(x[Key.TOTALS]))
+                callback(EnergyTotalsEvent.from_dict(x))
 
         return self.stream.async_add_listener(_handler, {Key.TOTALS: None})

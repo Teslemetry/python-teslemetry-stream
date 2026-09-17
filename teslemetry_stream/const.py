@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
 from typing import Any
@@ -31,6 +32,7 @@ class Key(StrEnum):
     SITE_INFO = "site_info"
     IS_CACHE = "isCache"
     CREATED_AT = "createdAt"
+    DATE = "date"
     ID = "id"
     PRODUCT_TYPE = "product_type"
     TOPIC = "topic"
@@ -417,8 +419,9 @@ class EnergyHistoryTotals:
 
     Mirrors the api's `ENERGY_HISTORY_TOTAL_FIELDS` (same names, same
     order): each field sums that quantity across the polled day's
-    time_series, and stays `None` rather than 0 when the field never
-    appeared in any period.
+    time_series. For a valid, non-empty day the server sends 0 for a field
+    that never appeared in any period; a field is `None` only when the
+    whole day is empty or malformed.
     """
 
     solar_energy_exported: float | None
@@ -447,6 +450,45 @@ class EnergyHistoryTotals:
     def from_dict(cls, data: dict[str, float | None]) -> EnergyHistoryTotals:
         """Build from the event's `totals` dict."""
         return cls(**{field: data.get(field) for field in cls.__dataclass_fields__})
+
+
+def parse_created_at(created_at: str) -> datetime:
+    """Parse a stream `createdAt` string into an aware UTC datetime.
+
+    Same wire format (and precision) as `stream.py`'s own `createdAt`
+    parsing, just returned as a `datetime` instead of epoch milliseconds.
+    """
+    main, _, fraction = created_at.partition(".")
+    dt = datetime.strptime(main, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    return dt.replace(microsecond=int(fraction[:3] or 0) * 1000) if fraction else dt
+
+
+@dataclass
+class EnergyTotalsEvent:
+    """A refreshed `energy_totals` notification.
+
+    Wraps the cumulative `totals` with the metadata needed to place them in
+    time: `date` is the site-local day the totals belong to, passed through
+    exactly as sent - the server's day boundary is site-local, so this must
+    never be reinterpreted in the client's own timezone. `created_at` is
+    derived from the latest period end. `is_cache` is `True` only for the
+    connect-time snapshot delivery.
+    """
+
+    date: str
+    created_at: datetime
+    is_cache: bool
+    totals: EnergyHistoryTotals
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EnergyTotalsEvent:
+        """Build from the event's top-level dict."""
+        return cls(
+            date=data[Key.DATE],
+            created_at=parse_created_at(data[Key.CREATED_AT]),
+            is_cache=bool(data.get(Key.IS_CACHE, False)),
+            totals=EnergyHistoryTotals.from_dict(data[Key.TOTALS]),
+        )
 
 
 @dataclass
