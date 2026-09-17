@@ -11,6 +11,7 @@ from typing import Any, cast
 import aiohttp
 
 from .const import CreditsEvent, Key
+from .const import parse_created_at as _parse_created_at_dt
 from .energysite import TeslemetryStreamEnergySite
 from .exception import TeslemetryStreamAuthenticationError, TeslemetryStreamEnded
 from .vehicle import TeslemetryStreamVehicle
@@ -614,12 +615,8 @@ def _parse_created_at(created_at: str) -> int:
     :param created_at: Timestamp as sent on the wire.
     :return: Milliseconds since the epoch.
     """
-    main, _, ns = created_at.partition(".")
-    return int(
-        datetime.strptime(main, "%Y-%m-%dT%H:%M:%S")
-        .replace(tzinfo=timezone.utc)
-        .timestamp()
-    ) * 1000 + int(ns[:3])
+    dt = _parse_created_at_dt(created_at)
+    return int(dt.timestamp()) * 1000 + dt.microsecond // 1000
 
 
 def _now() -> str:
