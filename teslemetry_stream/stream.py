@@ -455,11 +455,26 @@ class TeslemetryStream:
             return
 
         self._listen_task = current_task
+        connected_once = False
+
+        def _mark_connected(value: bool) -> None:
+            nonlocal connected_once
+            connected_once = connected_once or value
+
+        remove_connection_listener = self.async_add_connection_listener(_mark_connected)
         try:
-            async for event in self:
-                if event:
-                    self._dispatch(event)
+            try:
+                async for event in self:
+                    if event:
+                        self._dispatch(event)
+            except BaseException as error:
+                if not connected_once:
+                    LOGGER.warning("Listen task ended before its first connect: %r", error)
+                raise
+            if not connected_once:
+                LOGGER.warning("Listen task ended before its first connect")
         finally:
+            remove_connection_listener()
             self._close_response()
             if self._listen_task is current_task:
                 self._listen_task = None
