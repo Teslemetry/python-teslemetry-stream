@@ -306,6 +306,18 @@ class TeslemetryStream:
             self._response = None
             self._update_connection_listeners(False)
 
+    def _connection_failed(self) -> None:
+        """
+        Mark the stream down after a failed connect or read.
+        """
+        if self._response is None:
+            # A connect that never succeeded has no response to close, so
+            # _close_response() stays silent - without this a stream that is
+            # down from the start would never tell its listeners so.
+            self._update_connection_listeners(False)
+        else:
+            self._close_response()
+
     def close(self) -> None:
         """
         Stop the stream: closes the response and cancels the owned listen
@@ -367,17 +379,17 @@ class TeslemetryStream:
                     # a bad credential as an indefinitely quiet stream.
                     LOGGER.error("Authentication failed, not retrying: %s", repr(error))
                     self.active = False
-                    self._close_response()
+                    self._connection_failed()
                     raise TeslemetryStreamAuthenticationError() from error
                 LOGGER.warning("Client error: %s", repr(error))
-                self._close_response()
+                self._connection_failed()
                 delay = min(2**self.retries, 600)
                 LOGGER.debug("Reconnecting in %s seconds", delay)
                 await asyncio.sleep(delay)
                 self.retries += 1
             except Exception as error:
                 LOGGER.error("Unexpected error: %s", repr(error))
-                self._close_response()
+                self._connection_failed()
                 LOGGER.debug("Reconnecting in %s seconds", 1)
                 await asyncio.sleep(1)
 

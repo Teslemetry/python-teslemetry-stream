@@ -2497,12 +2497,12 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_TpmsHardWarnings(
-        self, callback: Callable[[int | None], None]
+        self, callback: Callable[[dict[str, Any] | None], None]
     ) -> Callable[[], None]:
         """Listen for TPMS Hard Warnings."""
         self._enable_field(Signal.TPMS_HARD_WARNINGS)
         return self.stream.async_add_listener(
-            make_int(Signal.TPMS_HARD_WARNINGS, callback),
+            make_dict(Signal.TPMS_HARD_WARNINGS, callback),
             {"vin": self.vin, "data": {Signal.TPMS_HARD_WARNINGS: None}},
         )
 
@@ -2587,12 +2587,12 @@ class TeslemetryStreamVehicle:
         )
 
     def listen_TpmsSoftWarnings(
-        self, callback: Callable[[int | None], None]
+        self, callback: Callable[[dict[str, Any] | None], None]
     ) -> Callable[[], None]:
         """Listen for TPMS Soft Warnings."""
         self._enable_field(Signal.TPMS_SOFT_WARNINGS)
         return self.stream.async_add_listener(
-            make_int(Signal.TPMS_SOFT_WARNINGS, callback),
+            make_dict(Signal.TPMS_SOFT_WARNINGS, callback),
             {"vin": self.vin, "data": {Signal.TPMS_SOFT_WARNINGS: None}},
         )
 
