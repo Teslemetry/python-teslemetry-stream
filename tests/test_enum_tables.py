@@ -1,4 +1,4 @@
-"""Pin TeslemetryEnum value tables in const.py against tesla-protocol 1.4.0.
+"""Pin TeslemetryEnum value tables in const.py against tesla-protocol 3.0.1.
 
 These tables are hand-maintained, not derived at runtime (see AGENTS.md for
 why), so this test is the thing that would catch drift against the proto
@@ -9,7 +9,7 @@ from __future__ import annotations
 from teslemetry_stream import const
 
 # name -> expected TeslemetryEnum.values, verified byte-for-byte against
-# tesla_protocol.telemetry.vehicle_data_pb2's enum descriptors (1.4.0).
+# tesla_protocol.telemetry.vehicle_data_pb2's enum descriptors (3.0.1).
 EXPECTED: dict[str, list[str]] = {
     "DetailedChargeState": [
         "DetailedChargeStateUnknown",
@@ -51,6 +51,8 @@ EXPECTED: dict[str, list[str]] = {
         "CarTypeModelY",
         "CarTypeSemiTruck",
         "CarTypeCybertruck",
+        "CarTypeSemiTruckV2",
+        "CarTypeCybercab",
     ],
 }
 
@@ -66,7 +68,7 @@ def main() -> None:
         table = getattr(const, name)
         results.append(
             check(
-                f"{name}.values matches tesla-protocol 1.4.0",
+                f"{name}.values matches tesla-protocol 3.0.1",
                 table.values == expected,
                 f"got {table.values}",
             )

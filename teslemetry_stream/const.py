@@ -698,7 +698,17 @@ BuckleStatus = TeslemetryEnum(
 
 CarType = TeslemetryEnum(
     "CarType",
-    ["Unknown", "ModelS", "ModelX", "Model3", "ModelY", "SemiTruck", "Cybertruck"],
+    [
+        "Unknown",
+        "ModelS",
+        "ModelX",
+        "Model3",
+        "ModelY",
+        "SemiTruck",
+        "Cybertruck",
+        "SemiTruckV2",
+        "Cybercab",
+    ],
 )
 
 ChargePort = TeslemetryEnum("ChargePort", ["Unknown", "US", "EU", "GB", "CCS"])
