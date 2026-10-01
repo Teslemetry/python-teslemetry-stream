@@ -342,6 +342,11 @@ Listen for vehicle error events. The callback receives a list of dictionaries co
 ### `listen_ChargerPower(callback: Callable[[float | None], None]) -> Callable[[],None]`
 Listen for charger power whether the vehicle is AC or DC charging. Combines `ACChargingPower` and `DCChargingPower` (DC preferred), gated by `DetailedChargeState`: the value drops to `0` when charging ends, since neither source is reliably reset then, and a lone zero while charging is held until both sources have reported. Enables all three fields; the returned function removes all three listeners.
 
+### `listen_ActiveRouteDestinationLocation(callback: Callable[[TeslaLocation | None], None]) -> Callable[[],None]`
+### `listen_ActiveRouteTrafficMinutesDelay(callback: Callable[[int | None], None]) -> Callable[[],None]`
+### `listen_ActiveRouteExpectedEnergyPercentAtTripArrival(callback: Callable[[int | None], None]) -> Callable[[],None]`
+Listen for a route field only while navigation is active. The car keeps reporting the last trip's `DestinationLocation`, `RouteTrafficMinutesDelay` and `ExpectedEnergyPercentAtTripArrival` after arriving, but `MinutesToArrival` goes null. Each listener pairs its field with `MinutesToArrival`, applying both from one event together: it reports `None` once `MinutesToArrival` is null, and otherwise the field's value once both have been seen. Enables both fields; the returned function removes all listeners.
+
 ### `listen_*` Methods
 The `TeslemetryStreamVehicle` class contains a `listen_*` methods for each telemetry signal.
 These methods allow you to listen to specific signals and handle their data in a type-safe manner.

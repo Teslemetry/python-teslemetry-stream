@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import aiohttp
 
@@ -64,6 +64,9 @@ else:
     TeslemetryStream = None
 
 LOGGER = logging.getLogger(__package__)
+
+
+_T = TypeVar("_T")
 
 
 class TeslemetryStreamVehicle:
@@ -3134,6 +3137,79 @@ class TeslemetryStreamVehicle:
             unsub_state()
 
         return _unsubscribe
+
+    def _listen_active_route(
+        self,
+        listen: Callable[[Callable[[_T | None], None]], Callable[[], None]],
+        callback: Callable[[_T | None], None],
+    ) -> Callable[[], None]:
+        """Listen for a route field, reporting None while no navigation is active.
+
+        After navigation ends Minutes to Arrival goes null, but the car keeps
+        the last trip's destination location, arrival energy and traffic delay.
+        Reports None once Minutes to Arrival is null, otherwise the value once
+        both have been seen.
+        """
+        value: _T | None = None
+        minutes: float | None = None
+        value_seen = minutes_seen = changed = False
+
+        def _value_callback(new_value: _T | None) -> None:
+            nonlocal value, value_seen, changed
+            value, value_seen, changed = new_value, True, True
+
+        def _minutes_callback(new_minutes: float | None) -> None:
+            nonlocal minutes, minutes_seen, changed
+            minutes, minutes_seen, changed = new_minutes, True, True
+
+        def _event_callback(event: dict[str, Any]) -> None:
+            # Registered last, so both fields from one event are applied
+            # together rather than briefly reporting a value from a route
+            # that just ended
+            nonlocal changed
+            if not changed:
+                return
+            changed = False
+            if minutes_seen and minutes is None:
+                callback(None)
+            elif minutes_seen and value_seen:
+                callback(value)
+
+        unsubs = (
+            listen(_value_callback),
+            self.listen_MinutesToArrival(_minutes_callback),
+            self.stream.async_add_listener(
+                _event_callback, {"vin": self.vin, "data": {}}
+            ),
+        )
+
+        def _unsubscribe() -> None:
+            for unsub in unsubs:
+                unsub()
+
+        return _unsubscribe
+
+    def listen_ActiveRouteDestinationLocation(
+        self, callback: Callable[[TeslaLocation | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Destination Location during navigation."""
+        return self._listen_active_route(self.listen_DestinationLocation, callback)
+
+    def listen_ActiveRouteTrafficMinutesDelay(
+        self, callback: Callable[[int | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Route Traffic Minutes Delay during navigation."""
+        return self._listen_active_route(
+            self.listen_RouteTrafficMinutesDelay, callback
+        )
+
+    def listen_ActiveRouteExpectedEnergyPercentAtTripArrival(
+        self, callback: Callable[[int | None], None]
+    ) -> Callable[[], None]:
+        """Listen for Expected Energy Percent at Trip Arrival during navigation."""
+        return self._listen_active_route(
+            self.listen_ExpectedEnergyPercentAtTripArrival, callback
+        )
 
 
 def make_int(
