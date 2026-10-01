@@ -339,6 +339,9 @@ Listen for vehicle alert events. The callback receives a list of dictionaries co
 ### `listen_Errors(callback: Callable[[list[dict]], None]) -> Callable[[],None]`
 Listen for vehicle error events. The callback receives a list of dictionaries containing error information.
 
+### `listen_ChargerPower(callback: Callable[[float | None], None]) -> Callable[[],None]`
+Listen for charger power whether the vehicle is AC or DC charging. Combines `ACChargingPower` and `DCChargingPower` (DC preferred), gated by `DetailedChargeState`: the value drops to `0` when charging ends, since neither source is reliably reset then, and a lone zero while charging is held until both sources have reported. Enables all three fields; the returned function removes all three listeners.
+
 ### `listen_*` Methods
 The `TeslemetryStreamVehicle` class contains a `listen_*` methods for each telemetry signal.
 These methods allow you to listen to specific signals and handle their data in a type-safe manner.

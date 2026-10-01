@@ -65,6 +65,7 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 | Native-event regression, source indistinguishability, no-dedup contract | `test_external_ingest.py` |
 | Energy event fixtures, int/str site-id matching | `test_energysite_events.py` |
 | Enum tables vs proto names | `test_enum_tables.py` |
+| `listen_ChargerPower` AC/DC aggregation and charge-state gating | `test_charger_power.py` |
 | `X-Library` header version suffix | `test_library_header.py` |
 
 ## Maintaining this file
