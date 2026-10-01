@@ -3082,6 +3082,59 @@ class TeslemetryStreamVehicle:
             {"vin": self.vin, "data": {Signal.SEMI_CRUISE_SPEED_LIMIT_MPH: None}},
         )
 
+    def listen_ChargerPower(
+        self, callback: Callable[[float | None], None]
+    ) -> Callable[[], None]:
+        """Listen for charger power, which arrives as AC or DC power.
+
+        Combines AC Charging Power and DC Charging Power into one value, gated
+        by Detailed Charge State: Starting/Charging is charging,
+        Disconnected/NoPower/Complete/Stopped is not, and any other state (or
+        none) says nothing. Power is zeroed when charging ends, since neither
+        source is reliably reset then.
+        """
+        power: dict[str, float | None] = {"ac": None, "dc": None}
+        charging: bool | None = None
+        seen: set[str] = set()
+
+        def _update(key: str, value: float | None) -> None:
+            # Power is not reliably reset when a charging session ends
+            power[key] = value if charging is not False or value is None else 0
+            seen.add(key)
+            ac, dc = power["ac"], power["dc"]
+            # While charging, a lone zero may precede the other source's
+            # restored power; otherwise that source may never report
+            if charging and len(seen) < 2 and not (ac or dc):
+                return
+            seen.update(power)
+            callback(dc or (ac if ac is not None else dc))
+
+        def _update_charging(state: str | None) -> None:
+            nonlocal charging
+            was_charging = charging
+            # Any other state, or none, says nothing about charging
+            if state in {"Starting", "Charging"}:
+                charging = True
+            elif state in {"Disconnected", "NoPower", "Complete", "Stopped"}:
+                charging = False
+            # The consumer may hold a restored power that was never streamed here
+            if was_charging is not False and charging is False:
+                power["ac"] = power["dc"] = 0
+                callback(0)
+
+        # Listeners run in registration order, so the charge state is
+        # registered first to gate power sent in the same message
+        unsub_state = self.listen_DetailedChargeState(_update_charging)
+        unsub_ac = self.listen_ACChargingPower(lambda value: _update("ac", value))
+        unsub_dc = self.listen_DCChargingPower(lambda value: _update("dc", value))
+
+        def _unsubscribe() -> None:
+            unsub_ac()
+            unsub_dc()
+            unsub_state()
+
+        return _unsubscribe
+
 
 def make_int(
     signal: Signal, callback: Callable[[int | None], None]
