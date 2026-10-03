@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class TeslemetryStreamError(Exception):
   """Teslemetry Stream Error"""
 
@@ -29,3 +32,14 @@ class TeslemetryStreamAuthenticationError(TeslemetryStreamError):
   """Teslemetry Stream Authentication Error"""
 
   message = "The access token was rejected (401/403) and will not be retried."
+
+
+class TeslemetryStreamBusinessKeyError(TeslemetryStreamError):
+  """Teslemetry Stream Business Key Error"""
+
+  message = "This request is not available to a Teslemetry for Business API key."
+
+  def __init__(self, message: str | None = None) -> None:
+      if message is not None:
+          self.message = message
+      super().__init__()

@@ -10,6 +10,7 @@ from .const import (
 from .energysite import TeslemetryStreamEnergySite
 from .exception import (
     TeslemetryStreamAuthenticationError,
+    TeslemetryStreamBusinessKeyError,
     TeslemetryStreamConnectionError,
     TeslemetryStreamEnded,
     TeslemetryStreamError,
@@ -28,6 +29,7 @@ __all__ = [
     "SseTopic",
     "TeslemetryStream",
     "TeslemetryStreamAuthenticationError",
+    "TeslemetryStreamBusinessKeyError",
     "TeslemetryStreamConnectionError",
     "TeslemetryStreamEnded",
     "TeslemetryStreamEnergySite",

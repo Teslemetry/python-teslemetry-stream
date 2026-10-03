@@ -52,6 +52,15 @@ async def main():
         remove()
 ```
 
+## Teslemetry for Business API keys
+
+A Teslemetry for Business API key (`Authorization: Bearer sk_...`) works with the same class, with these differences:
+
+- Pass `vin`. A business key can only stream one consented product (a VIN or an energy site id) at a time, so a stream without `vin` raises `ValueError` (or `TeslemetryStreamBusinessKeyError` on connect, when the token is a callable).
+- A business key may not call `/api/metadata`, so `find_server()` reads the product's region from `GET /api/business/products` instead. On the default or an empty `server`, the stream connects to that region host (`na.teslemetry.com` or `eu.teslemetry.com`). If the product is not shared with the business, the stream stops with `TeslemetryStreamBusinessKeyError`.
+- The server ends a business stream after 5 minutes so that a revoked consent or key takes effect. The stream reconnects at once, and connection listeners see it go down and up again.
+- `update_fields()` (PATCH) adds fields. `replace_fields()` (POST) is not available to a business key and returns 403.
+
 ## Using Typed Listen Methods
 
 The library provides typed listen methods for various telemetry signals. These methods allow you to listen to specific signals and handle their data in a type-safe manner. Here is an example of using the typed listen methods:
@@ -269,7 +278,7 @@ Return if connected.
 Get the current stream config.
 
 ### `find_server(self) -> None`
-Find the server using metadata.
+Find the server using metadata, or for a business key, the region of `vin` in the business product listing.
 
 ### `update_fields(fields: dict, vin: str) -> dict`
 Modify the Fleet Telemetry configuration.

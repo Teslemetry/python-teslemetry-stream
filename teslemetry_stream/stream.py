@@ -13,7 +13,11 @@ import aiohttp
 from .const import CreditsEvent, Key
 from .const import parse_created_at as _parse_created_at_dt
 from .energysite import TeslemetryStreamEnergySite
-from .exception import TeslemetryStreamAuthenticationError, TeslemetryStreamEnded
+from .exception import (
+    TeslemetryStreamAuthenticationError,
+    TeslemetryStreamBusinessKeyError,
+    TeslemetryStreamEnded,
+)
 from .vehicle import TeslemetryStreamVehicle
 
 LOGGER = logging.getLogger(__package__)
@@ -22,6 +26,17 @@ LOGGER = logging.getLogger(__package__)
 # numeric energy-site ids; the bare legacy value "python teslemetry-stream"
 # (no slash) means string-only.
 _LIBRARY_HEADER = f"python teslemetry-stream/{version('teslemetry-stream')}"
+
+# A Teslemetry for Business key is a WorkOS organization API key. It may not
+# call /api/metadata or open the account-wide /sse stream, so its region
+# comes from the business product listing instead.
+_BUSINESS_KEY_PREFIX = "sk_"
+_DEFAULT_SERVER = "api.teslemetry.com"
+
+
+def is_business_key(access_token: str | None) -> bool:
+    """Return True if the token is a Teslemetry for Business API key."""
+    return access_token is not None and access_token.startswith(_BUSINESS_KEY_PREFIX)
 
 
 class TeslemetryStream:
@@ -33,7 +48,7 @@ class TeslemetryStream:
         self,
         session: aiohttp.ClientSession,
         access_token: str | Callable[[], Awaitable[str | None]],
-        server: str = "api.teslemetry.com",
+        server: str = _DEFAULT_SERVER,
         vin: str | None = None,
         parse_timestamp: bool = False,
         manual: bool = False,
@@ -44,7 +59,10 @@ class TeslemetryStream:
 
         :param session: An aiohttp ClientSession.
         :param access_token: Access token for authentication.
-        :param server: Teslemetry server to connect to.
+        :param server: Teslemetry server to connect to. A Teslemetry for
+            Business key (`sk_...`) on the default or an empty server goes
+            to the region host of `vin` instead, found in the business
+            product listing.
         :param vin: Vehicle Identification Number.
         :param parse_timestamp: Whether to parse timestamps.
         :param manual: Whether to start listening manually.
@@ -58,6 +76,10 @@ class TeslemetryStream:
         """
         if server and not server.endswith(".teslemetry.com"):
             raise ValueError("Server must be on the teslemetry.com domain")
+        if isinstance(access_token, str) and is_business_key(access_token) and not vin:
+            raise ValueError(
+                "A Teslemetry for Business API key can only stream one product - pass vin"
+            )
 
         self.active: bool = False
         self.server = server
@@ -90,6 +112,12 @@ class TeslemetryStream:
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
         self.energysites: dict[int, TeslemetryStreamEnergySite] = {}
         self.fields: dict[str, Any] = {}
+        # Known once the token has been read - it may be a callable.
+        self.business: bool = isinstance(access_token, str) and is_business_key(
+            access_token
+        )
+        # Whether the region host for a business key is already resolved.
+        self._business_server_resolved = False
 
         if self.vin:
             self.vehicle: TeslemetryStreamVehicle = self.get_vehicle(self.vin)
@@ -100,6 +128,7 @@ class TeslemetryStream:
             access_token = await self.access_token()
         else:
             access_token = self.access_token
+        self.business = is_business_key(access_token)
         return {
             "Authorization": f"Bearer {access_token}",
             "X-Library": _LIBRARY_HEADER,
@@ -152,9 +181,16 @@ class TeslemetryStream:
 
     async def find_server(self) -> None:
         """
-        Find the server using metadata.
+        Find the server using metadata, or for a Teslemetry for Business key,
+        the region host of `vin` in the business product listing.
+
+        :raises TeslemetryStreamBusinessKeyError: If a business key has no
+            `vin`, or `vin` is not shared with the business.
         """
         headers = await self.headers()
+        if self.business:
+            await self._find_business_server(headers)
+            return
         req = await self._session.get(
             "https://api.teslemetry.com/api/metadata",
             headers=headers,
@@ -162,6 +198,30 @@ class TeslemetryStream:
         )
         response = await req.json()
         self.server = f"{response['region'].lower()}.teslemetry.com"
+
+    async def _find_business_server(self, headers: dict[str, str]) -> None:
+        """
+        Set the server to the region host of `vin` from the business product
+        listing. A business key may not call /api/metadata.
+        """
+        if not self.vin:
+            raise TeslemetryStreamBusinessKeyError(
+                "A Teslemetry for Business API key can only stream one product - pass vin"
+            )
+        req = await self._session.get(
+            f"https://{_DEFAULT_SERVER}/api/business/products",
+            headers=headers,
+            raise_for_status=True,
+        )
+        response = await req.json()
+        for product in response.get("response") or []:
+            if str(product.get("product_id")) == str(self.vin):
+                self.server = f"{product['region'].lower()}.teslemetry.com"
+                self._business_server_resolved = True
+                return
+        raise TeslemetryStreamBusinessKeyError(
+            f"{self.vin} is not shared with this business"
+        )
 
     async def update_fields(self, fields: dict[str, Any], vin: str) -> dict[str, Any]:
         """
@@ -258,11 +318,19 @@ class TeslemetryStream:
                 # already be connected, or a stop was requested outright.
                 return
 
+            headers = await self.headers()
+            if (
+                self.business
+                and self.server == _DEFAULT_SERVER
+                and not self._business_server_resolved
+            ):
+                # The default host proxies to the customer's region; going
+                # there directly saves a hop on every reconnect.
+                await self._find_business_server(headers)
             LOGGER.debug("Connecting to %s", self.server)
             url = f"https://{self.server}/sse"
             if self.vin:
                 url += f"/{self.vin}"
-            headers = await self.headers()
             params = {"topics": ",".join(self.topics)} if self.topics else None
             response = await self._session.get(
                 url,
@@ -370,8 +438,19 @@ class TeslemetryStream:
             except TeslemetryStreamEnded:
                 # A clean end of the response body is routine (e.g. a server
                 # deploy), not an error - reconnecting is the expected outcome.
-                LOGGER.info("Stream ended by server, reconnecting")
+                # The server also ends every business-key stream after a fixed
+                # 5-minute lifetime, so reconnecting re-runs admission.
+                if self.business:
+                    LOGGER.debug("Business stream lifetime ended, reconnecting")
+                else:
+                    LOGGER.info("Stream ended by server, reconnecting")
                 self._close_response()
+            except TeslemetryStreamBusinessKeyError as error:
+                # Retrying cannot change the business's product listing.
+                LOGGER.error("Business key error, not retrying: %s", error)
+                self.active = False
+                self._connection_failed()
+                raise
             except aiohttp.ClientError as error:
                 if isinstance(error, aiohttp.ClientResponseError) and error.status in (401, 403):
                     # A rejected token is a definitive answer, not a transient
