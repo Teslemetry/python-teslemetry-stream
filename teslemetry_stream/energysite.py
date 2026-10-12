@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from .const import EnergyTotalsEvent, Key
+from .const import EnergyTotalsEvent, Key, WallConnectorTotalsEvent, is_energy_totals
 
 if TYPE_CHECKING:
     from .stream import TeslemetryStream
@@ -98,7 +98,28 @@ class TeslemetryStreamEnergySite:
         wrapping it under `.totals`.
         """
         def _handler(x: dict[str, Any]) -> None:
-            if int(x[Key.ID]) == self.site_id:
+            if int(x[Key.ID]) == self.site_id and is_energy_totals(x[Key.TOTALS]):
                 callback(EnergyTotalsEvent.from_dict(x))
+
+        return self.stream.async_add_listener(_handler, {Key.TOTALS: None})
+
+    def listen_WallConnectorTotals(
+        self, callback: Callable[[WallConnectorTotalsEvent], None]
+    ) -> Callable[[], None]:
+        """Listen for wall_connector_totals notifications.
+
+        The callback receives a `WallConnectorTotalsEvent`: `totals` maps
+        Wall Connector DIN to Wh delivered on `date`, the installation-local
+        day, verbatim. A Wall Connector with no session that day is absent.
+        The server delivers a connect-time snapshot (`is_cache: True`, which
+        may be an earlier date), publishes while any Wall Connector is
+        charging and once more after charging stops - that closing event
+        carries the session's final total. Key updates by
+        `(site_id, din, date)` and use `created_at` to reject an older
+        replay. Like `energy_totals`, the site id rides `id`, not `site_id`.
+        """
+        def _handler(x: dict[str, Any]) -> None:
+            if int(x[Key.ID]) == self.site_id and not is_energy_totals(x[Key.TOTALS]):
+                callback(WallConnectorTotalsEvent.from_dict(x))
 
         return self.stream.async_add_listener(_handler, {Key.TOTALS: None})
