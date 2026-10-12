@@ -366,5 +366,8 @@ Listen for energy site info events. The callback receives the `site_info` docume
 ### `listen_TariffContentV2(callback: Callable[[dict | None], None]) -> Callable[[],None]`
 Listen for the site's V2 tariff document. The callback receives the `tariff_content_v2` document verbatim, or `None` when the server sends an explicit removal signal. Published only when it changes.
 
+### `listen_WallConnectorTotals(callback: Callable[[WallConnectorTotalsEvent], None]) -> Callable[[],None]`
+Listen for `wall_connector_totals` notifications. The callback receives a `WallConnectorTotalsEvent` with `date` (the installation-local day, verbatim), `created_at`, `is_cache` and `totals`, a dict of Wall Connector DIN to Wh delivered on `date` (a Wall Connector with no session that day is absent). Published while any Wall Connector is charging and once more after charging stops; a connect-time snapshot has `is_cache=True` and may be an earlier date. Key updates by `(site id, din, date)` and use `created_at` to reject an older replay.
+
 ### `listen_EnergyTotals(callback: Callable[[EnergyHistoryTotals], None]) -> Callable[[],None]`
 Listen for `energy_totals` refresh notifications. The callback receives an `EnergyHistoryTotals` dataclass of cumulative per-type totals - never the full time series. Fires only when the server's periodic history poll detects a change; a consumer wanting the full series should GET the underlying event's `url` via their own REST client.

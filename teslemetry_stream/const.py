@@ -378,6 +378,7 @@ class SseTopic(StrEnum):
     SITE_INFO = "site_info"
     TARIFF_CONTENT_V2 = "tariff_content_v2"
     ENERGY_TOTALS = "energy_totals"
+    WALL_CONNECTOR_TOTALS = "wall_connector_totals"
     CREDITS = "credits"
 
 
@@ -400,6 +401,7 @@ SSE_ENERGY_TOPICS: tuple[SseTopic, ...] = (
     SseTopic.SITE_INFO,
     SseTopic.TARIFF_CONTENT_V2,
     SseTopic.ENERGY_TOTALS,
+    SseTopic.WALL_CONNECTOR_TOTALS,
 )
 
 #: Convenience preset - every account-wide topic.
@@ -488,6 +490,47 @@ class EnergyTotalsEvent:
             created_at=parse_created_at(data[Key.CREATED_AT]),
             is_cache=bool(data.get(Key.IS_CACHE, False)),
             totals=EnergyHistoryTotals.from_dict(data[Key.TOTALS]),
+        )
+
+
+def is_energy_totals(totals: dict[str, Any]) -> bool:
+    """Tell an `energy_totals` payload from a `wall_connector_totals` one.
+
+    Both events share the `{id, date, createdAt, isCache?, totals}` envelope
+    and the decoded event carries no topic name, so the `totals` keys decide:
+    `energy_totals` always carries the fixed `EnergyHistoryTotals` names
+    (null when the day is empty), while `wall_connector_totals` is keyed by
+    Wall Connector DIN and may be empty.
+    """
+    return any(field in totals for field in EnergyHistoryTotals.__dataclass_fields__)
+
+
+@dataclass
+class WallConnectorTotalsEvent:
+    """A `wall_connector_totals` notification.
+
+    `totals` maps Wall Connector DIN to Wh delivered on `date`; a Wall
+    Connector with no session that day is absent. `date` is the
+    installation-local day, passed through exactly as sent - never
+    reinterpreted in the client's own timezone. Key updates by
+    `(site_id, din, date)` and use `created_at` to reject an older replay.
+    `is_cache` is `True` only for the connect-time snapshot, which may be
+    an earlier date.
+    """
+
+    date: str
+    created_at: datetime
+    is_cache: bool
+    totals: dict[str, float]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WallConnectorTotalsEvent:
+        """Build from the event's top-level dict."""
+        return cls(
+            date=data[Key.DATE],
+            created_at=parse_created_at(data[Key.CREATED_AT]),
+            is_cache=bool(data.get(Key.IS_CACHE, False)),
+            totals=dict(data[Key.TOTALS]),
         )
 
 

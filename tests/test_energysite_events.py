@@ -12,7 +12,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from teslemetry_stream.const import EnergyHistoryTotals, EnergyTotalsEvent
+from teslemetry_stream.const import (
+    EnergyHistoryTotals,
+    EnergyTotalsEvent,
+    WallConnectorTotalsEvent,
+)
 from teslemetry_stream.stream import TeslemetryStream, recursive_match
 
 SITE_A = "12345"
@@ -73,6 +77,13 @@ TARIFF_CONTENT_V2_EVENT: dict[str, Any] = {
 TARIFF_CONTENT_V2_NUMERIC_ID: dict[str, Any] = {
     **TARIFF_CONTENT_V2_EVENT,
     "site_id": int(SITE_A),
+}
+
+WALL_CONNECTOR_TOTALS_EVENT: dict[str, Any] = {
+    "id": SITE_A,
+    "date": "2026-07-29",
+    "createdAt": "2026-07-29T10:16:00.000Z",
+    "totals": {"DIN-1": 12500.5, "DIN-2": 800},
 }
 
 OTHER_SITE_LIVE_STATUS: dict[str, Any] = {
@@ -381,6 +392,61 @@ def main() -> None:
             "listen_LiveStatus still filters a mismatched numeric site_id",
             received == [],
             f"got {received}",
+        )
+    )
+
+    # listen_WallConnectorTotals delivers per-DIN totals with date, created_at, is_cache.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    wc_received: list[WallConnectorTotalsEvent] = []
+    site.listen_WallConnectorTotals(wc_received.append)
+    dispatch(stream, WALL_CONNECTOR_TOTALS_EVENT)
+    dispatch(
+        stream,
+        {
+            **WALL_CONNECTOR_TOTALS_EVENT,
+            "id": int(SITE_A),
+            "isCache": True,
+            "date": "2026-07-28",
+        },
+    )
+    dispatch(stream, {**WALL_CONNECTOR_TOTALS_EVENT, "id": SITE_B})
+    results.append(
+        check(
+            "listen_WallConnectorTotals parses totals, matches str/int id, filters other site",
+            wc_received
+            == [
+                WallConnectorTotalsEvent(
+                    date="2026-07-29",
+                    created_at=datetime(2026, 7, 29, 10, 16, 0, tzinfo=timezone.utc),
+                    is_cache=False,
+                    totals={"DIN-1": 12500.5, "DIN-2": 800},
+                ),
+                WallConnectorTotalsEvent(
+                    date="2026-07-28",
+                    created_at=datetime(2026, 7, 29, 10, 16, 0, tzinfo=timezone.utc),
+                    is_cache=True,
+                    totals={"DIN-1": 12500.5, "DIN-2": 800},
+                ),
+            ],
+            f"got {wc_received}",
+        )
+    )
+
+    # The two totals events share an envelope; each listener ignores the other's.
+    stream = make_stream()
+    site = stream.get_energysite(SITE_A)
+    wc_received = []
+    totals_received = []
+    site.listen_WallConnectorTotals(wc_received.append)
+    site.listen_EnergyTotals(totals_received.append)
+    dispatch(stream, ENERGY_TOTALS_EVENT)
+    dispatch(stream, {**WALL_CONNECTOR_TOTALS_EVENT, "totals": {}})
+    results.append(
+        check(
+            "energy_totals and wall_connector_totals do not cross-deliver",
+            len(totals_received) == 1 and len(wc_received) == 1 and wc_received[0].totals == {},
+            f"energy={totals_received} wc={wc_received}",
         )
     )
 
