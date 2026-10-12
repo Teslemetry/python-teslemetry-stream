@@ -5,7 +5,7 @@ request headers - including "Authorization: Bearer <token>". Logging
 repr(error) on a stream error (e.g. a 5xx from the SSE endpoint) wrote the
 token into every Home Assistant log that shipped it anywhere. These tests
 fail any log record that contains the token, on the retry path (5xx), the
-auth-failure path (401) and the listen-task path.
+auth-failure path (401) and the listen-task path, and check _describe itself.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from multidict import CIMultiDict, CIMultiDictProxy
 from yarl import URL
 
 from teslemetry_stream.exception import TeslemetryStreamAuthenticationError
-from teslemetry_stream.stream import LOGGER, TeslemetryStream
+from teslemetry_stream.stream import LOGGER, TeslemetryStream, _describe
 
 TOKEN = "s3cr3t-access-token-value"
 REQUEST_INFO = aiohttp.RequestInfo(
@@ -116,6 +116,19 @@ async def test_fixture_would_leak_through_repr(results: list[bool]) -> None:
     )
 
 
+async def test_describe_omits_headers(results: list[bool]) -> None:
+    described = _describe(response_error(400, "Bad Request"))
+    results.append(check("_describe omits the token", TOKEN not in described, described))
+    results.append(
+        check(
+            "_describe keeps the type, status and message",
+            described.startswith("ClientResponseError: 400")
+            and "Bad Request" in described,
+            described,
+        )
+    )
+
+
 async def test_server_error_does_not_log_token(results: list[bool]) -> None:
     session = FakeSession([FakeResponse(), FakeResponse()])
     stream = make_stream(session)
@@ -152,13 +165,40 @@ async def test_auth_failure_does_not_log_token(results: list[bool]) -> None:
     with CaptureLogs() as records, contextlib.suppress(TeslemetryStreamAuthenticationError):
         await stream.listen()
 
+    auth_logs = [r.getMessage() for r in records if "Authentication failed" in r.getMessage()]
+    results.append(check("a 401 logs the authentication failure", len(auth_logs) == 1))
     results.append(
         check(
-            "a 401 logs the authentication failure",
-            any("Authentication failed" in r.getMessage() for r in records),
+            "the authentication log keeps the status and message",
+            bool(auth_logs) and "401" in auth_logs[0] and "Unauthorized" in auth_logs[0],
+            f"got {auth_logs}",
         )
     )
     results.append(check("no log record contains the token (401)", not leaked(records)))
+
+
+async def test_listen_ended_before_connect_does_not_log_token(results: list[bool]) -> None:
+    """A connection listener that raises while the first connect is failing
+    ends the listen task, which logs the escaping error."""
+    session = FakeSession([response_error(502, "Bad Gateway")])
+    stream = make_stream(session)
+
+    def failing_listener(connected: bool) -> None:
+        raise response_error(500, "listener failed")
+
+    stream.async_add_connection_listener(failing_listener)
+
+    with CaptureLogs() as records, contextlib.suppress(aiohttp.ClientResponseError):
+        await stream.listen()
+
+    ended = [r.getMessage() for r in records if "ended before its first connect" in r.getMessage()]
+    results.append(
+        check("the listen task logs ending before its first connect", len(ended) == 1)
+    )
+    results.append(
+        check("no log record contains the token (listen task)", not leaked(records))
+    )
+    stream.close()
 
 
 class CaptureLogs:
@@ -189,8 +229,10 @@ class _ListHandler(logging.Handler):
 async def main() -> None:
     results: list[bool] = []
     await test_fixture_would_leak_through_repr(results)
+    await test_describe_omits_headers(results)
     await test_server_error_does_not_log_token(results)
     await test_auth_failure_does_not_log_token(results)
+    await test_listen_ended_before_connect_does_not_log_token(results)
 
     print("-" * 72)
     print("ALL PASS" if all(results) else "FAILURES PRESENT")
