@@ -377,18 +377,18 @@ class TeslemetryStream:
                     # A rejected token is a definitive answer, not a transient
                     # blip - retrying it can never succeed, and doing so masks
                     # a bad credential as an indefinitely quiet stream.
-                    LOGGER.error("Authentication failed, not retrying: %s", repr(error))
+                    LOGGER.error("Authentication failed, not retrying: %s", _describe(error))
                     self.active = False
                     self._connection_failed()
                     raise TeslemetryStreamAuthenticationError() from error
-                LOGGER.warning("Client error: %s", repr(error))
+                LOGGER.warning("Client error: %s", _describe(error))
                 self._connection_failed()
                 delay = min(2**self.retries, 600)
                 LOGGER.debug("Reconnecting in %s seconds", delay)
                 await asyncio.sleep(delay)
                 self.retries += 1
             except Exception as error:
-                LOGGER.error("Unexpected error: %s", repr(error))
+                LOGGER.error("Unexpected error: %s", _describe(error))
                 self._connection_failed()
                 LOGGER.debug("Reconnecting in %s seconds", 1)
                 await asyncio.sleep(1)
@@ -481,7 +481,9 @@ class TeslemetryStream:
                         self._dispatch(event)
             except BaseException as error:
                 if not connected_once:
-                    LOGGER.warning("Listen task ended before its first connect: %r", error)
+                    LOGGER.warning(
+                        "Listen task ended before its first connect: %s", _describe(error)
+                    )
                 raise
             if not connected_once:
                 LOGGER.warning("Listen task ended before its first connect")
@@ -644,6 +646,20 @@ def _parse_created_at(created_at: str) -> int:
     """
     dt = _parse_created_at_dt(created_at)
     return int(dt.timestamp()) * 1000 + dt.microsecond // 1000
+
+
+def _describe(error: BaseException) -> str:
+    """
+    Describe an exception for the log without its repr.
+
+    The repr of an aiohttp.ClientResponseError embeds its RequestInfo, including the
+    request headers - the Authorization header carries the access token. str() of the
+    aiohttp errors has the status, message and URL only.
+
+    :param error: The exception to describe.
+    :return: "<ExceptionType>: <message>".
+    """
+    return f"{type(error).__name__}: {error}"
 
 
 def _now() -> str:
