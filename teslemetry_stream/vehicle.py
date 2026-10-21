@@ -1254,7 +1254,7 @@ class TeslemetryStreamVehicle:
         """Listen for Front Driver Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("DriverFront")),
+            make_door("DriverFront", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -1264,7 +1264,7 @@ class TeslemetryStreamVehicle:
         """Listen for Rear Driver Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("DriverRear")),
+            make_door("DriverRear", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -1274,7 +1274,7 @@ class TeslemetryStreamVehicle:
         """Listen for Front Passenger Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("PassengerFront")),
+            make_door("PassengerFront", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -1284,7 +1284,7 @@ class TeslemetryStreamVehicle:
         """Listen for Rear Passenger Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("PassengerRear")),
+            make_door("PassengerRear", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -1294,7 +1294,7 @@ class TeslemetryStreamVehicle:
         """Listen for Front Trunk Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("TrunkFront")),
+            make_door("TrunkFront", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -1304,7 +1304,7 @@ class TeslemetryStreamVehicle:
         """Listen for Rear Trunk Door State."""
         self._enable_field(Signal.DOOR_STATE)
         return self.stream.async_add_listener(
-            lambda x: callback(x["data"][Signal.DOOR_STATE].get("TrunkRear")),
+            make_door("TrunkRear", callback),
             {"vin": self.vin, "data": {Signal.DOOR_STATE: None}},
         )
 
@@ -3273,6 +3273,18 @@ def make_dict(
         if not isinstance(data, dict):
             data = None
         callback(data)
+
+    return typer
+
+
+def make_door(
+    key: str, callback: Callable[[bool | None], None]
+) -> Callable[[dict[str, Any]], None]:
+    """Listener factory for one door within DoorState; a null or non-dict DoorState yields None."""
+
+    def typer(event: dict[str, Any]) -> None:
+        data = event["data"][Signal.DOOR_STATE]
+        callback(data.get(key) if isinstance(data, dict) else None)
 
     return typer
 
