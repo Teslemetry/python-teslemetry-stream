@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import Any
 
-from teslemetry_stream.vehicle import TeslemetryStreamVehicle
+from teslemetry_stream.vehicle import LOGGER, TeslemetryStreamVehicle
 
 VIN_A = "TESTVIN0000000001"
 VIN_B = "TESTVIN0000000002"
@@ -61,6 +61,17 @@ class CaptureWarnings(logging.Handler):
 
     def __init__(self) -> None:
         super().__init__(level=logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+class CaptureErrors(logging.Handler):
+    """Collect formatted ERROR records emitted by the library."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
         self.messages: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -188,6 +199,102 @@ async def main() -> None:
             "a failed update records no fields",
             vehicle.fields == {},
             f"fields {sorted(vehicle.fields)}",
+        )
+    )
+
+    # A streaming allowance refusal logs the description and drops the batch.
+    over = {
+        "response": None,
+        "error": "streaming_allowance_exceeded",
+        "error_description": "This streaming configuration uses 120% of your allowance",
+    }
+    vehicle = make_vehicle(VIN_A, [over])
+    captured = CaptureErrors()
+    LOGGER.addHandler(captured)
+    try:
+        await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    finally:
+        LOGGER.removeHandler(captured)
+    results.append(
+        check(
+            "allowance refusal logs the error description",
+            any("120% of your allowance" in m for m in captured.messages)
+            and not any("streaming_allowance_exceeded" in m for m in captured.messages),
+            f"logged {captured.messages}",
+        )
+    )
+    results.append(
+        check(
+            "allowance refusal clears the pending config",
+            vehicle._config == {} and vehicle.fields == {},
+            f"pending {vehicle._config}, fields {sorted(vehicle.fields)}",
+        )
+    )
+
+    # The config-refused listener gets (error, description) once; a removed
+    # listener is not called; a raising listener does not block the others.
+    vehicle = make_vehicle(VIN_A, [over, FAILED, over])
+    calls: list[tuple[str, str | None]] = []
+    later: list[tuple[str, str | None]] = []
+
+    def boom(error: str, description: str | None) -> None:
+        raise RuntimeError("listener bug")
+
+    vehicle.listen_config_refused(boom)
+    vehicle.listen_config_refused(lambda e, d: calls.append((e, d)))
+    remove_later = vehicle.listen_config_refused(lambda e, d: later.append((e, d)))
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "config-refused listener called once with error and description",
+            calls == [(over["error"], over["error_description"])]
+            and later == calls,
+            f"calls {calls}",
+        )
+    )
+    remove_later()
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "removed listener not called; other errors reach listeners",
+            len(later) == 1 and calls[-1] == ("upstream internal error", None),
+            f"calls {calls}, later {later}",
+        )
+    )
+    vehicle = make_vehicle(VIN_A, [ACCEPTED])
+    seen: list[Any] = []
+    vehicle.listen_config_refused(lambda e, d: seen.append(e))
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(check("success does not call the listener", seen == []))
+
+    # The same callback registered twice has independent, idempotent removers.
+    vehicle = make_vehicle(VIN_A, [over, over])
+    twice: list[str] = []
+
+    def same(error: str, description: str | None) -> None:
+        twice.append(error)
+
+    remove_first = vehicle.listen_config_refused(same)
+    vehicle.listen_config_refused(same)
+    remove_first()
+    remove_first()
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "repeated remove only removes its own registration",
+            len(twice) == 1,
+            f"calls {twice}",
+        )
+    )
+
+    # Any other error keeps the pending config for the next explicit trigger.
+    vehicle = make_vehicle(VIN_A, [FAILED])
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "other errors keep the pending config",
+            vehicle._config == {"fields": {"BatteryLevel": None}},
+            f"pending {vehicle._config}",
         )
     )
 
