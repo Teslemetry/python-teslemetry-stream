@@ -231,6 +231,42 @@ async def main() -> None:
         )
     )
 
+    # The config-refused listener gets (error, description) once; a removed
+    # listener is not called; a raising listener does not block the others.
+    vehicle = make_vehicle(VIN_A, [over, FAILED, over])
+    calls: list[tuple[str, str | None]] = []
+    later: list[tuple[str, str | None]] = []
+
+    def boom(error: str, description: str | None) -> None:
+        raise RuntimeError("listener bug")
+
+    vehicle.listen_config_refused(boom)
+    vehicle.listen_config_refused(lambda e, d: calls.append((e, d)))
+    remove_later = vehicle.listen_config_refused(lambda e, d: later.append((e, d)))
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "config-refused listener called once with error and description",
+            calls == [(over["error"], over["error_description"])]
+            and later == calls,
+            f"calls {calls}",
+        )
+    )
+    remove_later()
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "removed listener not called; other errors reach listeners",
+            len(later) == 1 and calls[-1] == ("upstream internal error", None),
+            f"calls {calls}, later {later}",
+        )
+    )
+    vehicle = make_vehicle(VIN_A, [ACCEPTED])
+    seen: list[Any] = []
+    vehicle.listen_config_refused(lambda e, d: seen.append(e))
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(check("success does not call the listener", seen == []))
+
     # Any other error keeps the pending config for the next explicit trigger.
     vehicle = make_vehicle(VIN_A, [FAILED])
     await vehicle.update_config({"fields": {"BatteryLevel": None}})

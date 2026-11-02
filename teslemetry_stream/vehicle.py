@@ -98,6 +98,8 @@ class TeslemetryStreamVehicle:
         # listeners (e.g. HA integration setup) discovering an unpopulated
         # vehicle joins one GET instead of each starting its own.
         self._populate_flight = None
+        # Callbacks told when the server refuses a config update.
+        self._config_refused_listeners: list[Callable[[str, str | None], None]] = []
         # Registered from birth, not lazily, so no connection can ever
         # predate this listener and miss a config event. Safe outside a
         # running loop: `internal=True` makes async_add_listener's
@@ -258,10 +260,12 @@ class TeslemetryStreamVehicle:
                     self.vin,
                     data.get("error_description") or error,
                 )
+                description = data.get("error_description")
                 if error == "streaming_allowance_exceeded":
                     # The account is over its streaming allowance, so replaying
                     # this config on the next trigger would be refused again.
                     self._config.clear()
+                self._notify_config_refused(str(error), description)
                 return
 
             ignored = data.get("ignoredFields") or []
@@ -284,6 +288,33 @@ class TeslemetryStreamVehicle:
                 LOGGER.debug("Configured streaming fields %s", ", ".join(applied))
                 self.fields = {**self.fields, **applied}
             self._config.clear()
+
+    def _notify_config_refused(self, error: str, description: str | None) -> None:
+        """Tell each config-refused listener; one failing must not stop the rest."""
+        for callback in list(self._config_refused_listeners):
+            try:
+                callback(error, description)
+            except Exception:
+                LOGGER.exception(
+                    "Config refused listener failed for %s", self.vin
+                )
+
+    def listen_config_refused(
+        self, callback: Callable[[str, str | None], None]
+    ) -> Callable[[], None]:
+        """Call back with (error, description) when the server refuses a config.
+
+        Fires for every error-shaped response to a config update, for example
+        ``streaming_allowance_exceeded``; the caller filters on ``error``.
+        Returns a function that removes the listener.
+        """
+        self._config_refused_listeners.append(callback)
+
+        def remove() -> None:
+            if callback in self._config_refused_listeners:
+                self._config_refused_listeners.remove(callback)
+
+        return remove
 
     async def _patch_with_bounded_retry(
         self, config: dict[str, Any]
