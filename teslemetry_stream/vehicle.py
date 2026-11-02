@@ -254,8 +254,14 @@ class TeslemetryStreamVehicle:
 
             if error := data.get("error"):
                 LOGGER.error(
-                    "Error updating streaming config for %s: %s", self.vin, error
+                    "Error updating streaming config for %s: %s",
+                    self.vin,
+                    data.get("error_description") or error,
                 )
+                if error == "streaming_allowance_exceeded":
+                    # The account is over its streaming allowance, so replaying
+                    # this config on the next trigger would be refused again.
+                    self._config.clear()
                 return
 
             ignored = data.get("ignoredFields") or []

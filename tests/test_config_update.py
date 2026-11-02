@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import Any
 
-from teslemetry_stream.vehicle import TeslemetryStreamVehicle
+from teslemetry_stream.vehicle import LOGGER, TeslemetryStreamVehicle
 
 VIN_A = "TESTVIN0000000001"
 VIN_B = "TESTVIN0000000002"
@@ -61,6 +61,17 @@ class CaptureWarnings(logging.Handler):
 
     def __init__(self) -> None:
         super().__init__(level=logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+class CaptureErrors(logging.Handler):
+    """Collect formatted ERROR records emitted by the library."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
         self.messages: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -188,6 +199,46 @@ async def main() -> None:
             "a failed update records no fields",
             vehicle.fields == {},
             f"fields {sorted(vehicle.fields)}",
+        )
+    )
+
+    # A streaming allowance refusal logs the description and drops the batch.
+    over = {
+        "response": None,
+        "error": "streaming_allowance_exceeded",
+        "error_description": "This streaming configuration uses 120% of your allowance",
+    }
+    vehicle = make_vehicle(VIN_A, [over])
+    captured = CaptureErrors()
+    LOGGER.addHandler(captured)
+    try:
+        await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    finally:
+        LOGGER.removeHandler(captured)
+    results.append(
+        check(
+            "allowance refusal logs the error description",
+            any("120% of your allowance" in m for m in captured.messages)
+            and not any("streaming_allowance_exceeded" in m for m in captured.messages),
+            f"logged {captured.messages}",
+        )
+    )
+    results.append(
+        check(
+            "allowance refusal clears the pending config",
+            vehicle._config == {} and vehicle.fields == {},
+            f"pending {vehicle._config}, fields {sorted(vehicle.fields)}",
+        )
+    )
+
+    # Any other error keeps the pending config for the next explicit trigger.
+    vehicle = make_vehicle(VIN_A, [FAILED])
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "other errors keep the pending config",
+            vehicle._config == {"fields": {"BatteryLevel": None}},
+            f"pending {vehicle._config}",
         )
     )
 
