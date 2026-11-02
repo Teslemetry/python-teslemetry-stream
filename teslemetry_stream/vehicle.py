@@ -99,7 +99,9 @@ class TeslemetryStreamVehicle:
         # vehicle joins one GET instead of each starting its own.
         self._populate_flight = None
         # Callbacks told when the server refuses a config update.
-        self._config_refused_listeners: list[Callable[[str, str | None], None]] = []
+        self._config_refused_listeners: dict[
+            object, Callable[[str, str | None], None]
+        ] = {}
         # Registered from birth, not lazily, so no connection can ever
         # predate this listener and miss a config event. Safe outside a
         # running loop: `internal=True` makes async_add_listener's
@@ -291,7 +293,7 @@ class TeslemetryStreamVehicle:
 
     def _notify_config_refused(self, error: str, description: str | None) -> None:
         """Tell each config-refused listener; one failing must not stop the rest."""
-        for callback in list(self._config_refused_listeners):
+        for callback in list(self._config_refused_listeners.values()):
             try:
                 callback(error, description)
             except Exception:
@@ -308,11 +310,14 @@ class TeslemetryStreamVehicle:
         ``streaming_allowance_exceeded``; the caller filters on ``error``.
         Returns a function that removes the listener.
         """
-        self._config_refused_listeners.append(callback)
+        # Each registration has its own identity, so registering the same
+        # callback twice gives two independent removers, and a repeated
+        # remove() only ever removes its own registration.
+        key = object()
+        self._config_refused_listeners[key] = callback
 
         def remove() -> None:
-            if callback in self._config_refused_listeners:
-                self._config_refused_listeners.remove(callback)
+            self._config_refused_listeners.pop(key, None)
 
         return remove
 

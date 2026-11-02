@@ -267,6 +267,26 @@ async def main() -> None:
     await vehicle.update_config({"fields": {"BatteryLevel": None}})
     results.append(check("success does not call the listener", seen == []))
 
+    # The same callback registered twice has independent, idempotent removers.
+    vehicle = make_vehicle(VIN_A, [over, over])
+    twice: list[str] = []
+
+    def same(error: str, description: str | None) -> None:
+        twice.append(error)
+
+    remove_first = vehicle.listen_config_refused(same)
+    vehicle.listen_config_refused(same)
+    remove_first()
+    remove_first()
+    await vehicle.update_config({"fields": {"BatteryLevel": None}})
+    results.append(
+        check(
+            "repeated remove only removes its own registration",
+            len(twice) == 1,
+            f"calls {twice}",
+        )
+    )
+
     # Any other error keeps the pending config for the next explicit trigger.
     vehicle = make_vehicle(VIN_A, [FAILED])
     await vehicle.update_config({"fields": {"BatteryLevel": None}})
