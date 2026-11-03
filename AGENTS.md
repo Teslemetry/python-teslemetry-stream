@@ -5,9 +5,11 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 ## Build, test, release
 
 - CI (`.github/workflows/ci.yml`) runs `lint` (ruff + mypy), `test` (Python 3.9-3.13 matrix), `build` (`uv build` + `twine check`). Ruff, mypy and twine are deliberately not dev dependencies - `uv sync` won't install them; CI runs each ephemerally via `uv run --with <tool> <tool> ...`. Do the same locally.
+- `lint` runs `ruff check` and `mypy` on `teslemetry_stream/` only. `tests/` is not linted and already has ruff errors, and `ruff format` is not enforced (the package is not format-clean). Run `ruff check` on the package plus the test files you touched; do not reformat untouched code.
 - `tests/` files are plain scripts (`if __name__ == "__main__"`), not pytest-based - pytest would collect zero tests. Run each directly: `uv run python tests/test_config_events.py`.
 - The `test` job fails outright when `tests/test_*.py` matches nothing. Do not reintroduce a silent-skip fallback.
 - Releases go through `.github/workflows/release.yml` on a `v*.*.*` tag: lint + the full test matrix must pass on the release SHA before build, then trusted-publishing OIDC publishes to PyPI and a GitHub release is cut. It carries `workflow_dispatch` so a run that failed before publish can be re-run without tag surgery.
+  - A release is its own PR that changes `version` in `pyproject.toml` and in the `teslemetry-stream` entry of `uv.lock` - nothing else (there is no changelog). Push the `v*.*.*` tag on that PR's merge commit, never before it merges.
   - It **must stay a top-level workflow**, never a `workflow_call` reusable one: PyPI's trusted publisher is bound to the `release.yml` + `pypi` environment identity, and a reusable workflow signs PEP 740 attestations under the *caller's* identity, which that publisher rejects.
   - `jobs.<id>.environment.name`/`.url` **cannot reference the `env` context** (only `github`, `inputs`, `vars`, `needs`, `secrets`, `strategy`, `matrix` resolve there). Doing so is a workflow-file parse error that fails the whole file at startup, before trigger filtering - every push, zero jobs, no logs. Use literals or `vars.*`.
 
@@ -33,7 +35,7 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 ## Vehicle config (`vehicle.py`)
 
 - Config responses are shaped inconsistently: success is flat (`{"updated_vehicles": n}`, plus `ignoredFields` when some were dropped), errors are wrapped (`{"response": null, "error": ...}`). Do not look for `updated_vehicles` under `response` - that lookup silently never matches.
-- `update_config` funnels every caller through one per-vehicle single-flight flush (`_flush`): the first caller starts it, later callers merge into the same pending config and await it. This is why a batch of listeners scheduled at once (e.g. HA integration setup) produces one PATCH, not one per listener. A body-shaped error (`{"error": ...}`) is terminal for that batch - not replayed, but the pending config survives for the next explicit `update_config`. A transport-level failure (`ClientError`/timeout) gets one bounded retry inside the same flush.
+- `update_config` funnels every caller through one per-vehicle single-flight flush (`_flush`): the first caller starts it, later callers merge into the same pending config and await it. This is why a batch of listeners scheduled at once (e.g. HA integration setup) produces one PATCH, not one per listener. A body-shaped error (`{"error": ...}`) is terminal for that batch - not replayed - and is passed to every `listen_config_refused` callback. The pending config survives for the next explicit `update_config`, except on `streaming_allowance_exceeded`, which clears it because a replay would be refused again. A transport-level failure (`ClientError`/timeout) gets one bounded retry inside the same flush.
 - `fields` is kept fresh against *server-side* changes (another client, the console, a Teslemetry migration), not just this client's own history. `__init__` registers `_on_config_event` as an internal listener unconditionally at construction - not lazily - so no connection can predate it and miss an event. A well-typed `fields` piece replaces the record (every nested entry must itself be a dict; one bad entry rejects the whole piece rather than leaving something `add_field` would crash on); a missing piece is left untouched; a malformed piece is logged and skipped without touching pending `_config`. The stored dict and each nested per-field dict are **copied, never aliased** to the event handed to public listeners.
 - prefer_typed is server-side default now (no per-vehicle toggle exists), but it is a default, not a guarantee: some vehicles still stream string-encoded numerics/booleans, so `make_int`/`make_float`/`make_bool` must keep coercing a `str` payload.
 - `add_field` gates its no-op skip on `_populated`, not on connection/topic state. An unpopulated vehicle awaits `_ensure_populated()` - a single-flight `get_config()` GET that concurrent callers join - before deciding; a populated one trusts `fields` with no network call. `_populated` is set by a successful `get_config()` (200 **or** 404 - both authoritative; 404 also clears `fields`, since "no config exists" is itself the answer) and by every `_on_config_event`, and cleared by `_on_connection_event` on disconnect, so a field-config call landing in a reconnect window re-fetches instead of trusting pre-disconnect data. A *failed* fetch is not authoritative: `_ensure_populated()` catches, logs, and leaves the vehicle unpopulated rather than propagating - every `listen_*` reaches `add_field()` through `_enable_field()`'s fire-and-forget `create_task()`, where an uncaught exception would silently abandon the field request.
@@ -41,31 +43,11 @@ Project-intrinsic knowledge that should travel with the code: build, test, relea
 ## Energy sites (`energysite.py`)
 
 - Energy events are shaped unlike vehicle signals: `live_status`/`site_info` are flat top-level envelopes (`{createdAt, site_id, isCache?, live_status|site_info}`), not nested under `data`, and carry a full opaque document rather than a field delta. There is no per-field config to enable - the server auto-polls subscribed sites.
-- `energy_totals` differs again: the site id rides `id`, **not** `site_id` - filter on `id` and `totals`. Wire payload is `id`/`date`/`createdAt`/`totals`, plus `isCache` only when true. `date` is the site-local day the totals belong to and must be passed through unchanged - never reinterpreted in the client's own timezone, since the server finalises a day's rollover after local midnight. `listen_EnergyTotals` delivers an `EnergyTotalsEvent` (`date`, parsed `created_at`, `is_cache`, `totals`); `totals` is a compact cumulative `EnergyHistoryTotals` object, not a document. Each `EnergyHistoryTotals` field is `0` for a valid non-empty day where that field never appeared in any period, and `None` only when the whole day is empty or malformed.
+- `energy_totals` and `wall_connector_totals` differ again: the site id rides `id`, **not** `site_id`. Both share one envelope (`id`/`date`/`createdAt`/`totals`, `isCache` only when true), and a dispatched event carries no SSE topic name, so their listeners tell them apart only by the `totals` keys (`is_energy_totals()` in `const.py`). A new topic with the same envelope needs its own payload discriminator.
 - `site_info` does **not** carry `tariff_content`/`tariff_content_v2`. The V2 tariff is its own event/listener (`listen_TariffContentV2`), same envelope shape, with a `None` body meaning explicit server-side removal rather than "not received yet".
 - All of these share a silence-means-no-change contract: the server sends a connect-time snapshot and then fires only on change. Freshness lives in REST, never in event cadence.
 - There is deliberately no helper recombining `site_info` and `tariff_content_v2` - it would only ever cover V2 (legacy V1 `tariff_content` has no SSE topic and stays REST-only). A consumer wanting both tariffs uses the REST site_info endpoint.
 - Site ids are `int` throughout, matching Tesla's own JSON-number representation: `get_energysite(site_id: str | int)` normalises via `int(...)` (raising `ValueError` on a non-numeric id), `TeslemetryStream.energysites` is keyed by int, `TeslemetryStreamEnergySite.site_id` is an int, and every site-id/`Key.ID` comparison in `energysite.py` casts the incoming event value with `int(...)` before comparing - so an event carrying either a string or a number matches. The `X-Library` header's `/<version>` suffix (`stream.py`, read from installed package metadata) is the api's signal that this client accepts numeric ids; the bare legacy value means string-only.
-
-## Test map
-
-| Area | Test |
-| --- | --- |
-| Config record merge, nested-entry validation | `test_config_events.py` |
-| Config listener registration, auto-close exclusion, populated gating | `test_config_listener_lifecycle.py` |
-| Config response-shape handling | `test_config_update.py` |
-| One-PATCH-per-batch coalescing | `test_batch_retry_storm.py` |
-| Reconnect-window re-fetch race | `test_reconnect_config_window.py` |
-| Listen task ownership, dispatch snapshots/order, close races | `test_stream_lifecycle.py` |
-| 401/403 terminal vs transient retry | `test_auth_failure.py` |
-| Clean vs abrupt stream end logging | `test_clean_stream_end.py` |
-| `listen()` early exit before first connect logs ERROR and re-raises | `test_listen_early_exit.py` |
-| `str` payload coercion against real telemetry | `test_field_type_coercion.py` |
-| `topics` URL construction, empty/bare-string handling, tariff listener | `test_sse_topics.py` |
-| Native-event regression, source indistinguishability, no-dedup contract | `test_external_ingest.py` |
-| Energy event fixtures, int/str site-id matching | `test_energysite_events.py` |
-| Enum tables vs proto names | `test_enum_tables.py` |
-| `X-Library` header version suffix | `test_library_header.py` |
 
 ## Maintaining this file
 
