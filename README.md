@@ -20,7 +20,7 @@ The TeslemetryStream class requires:
 - access_token: an access token from the [Teslemetry console](https://teslemetry.com/console)
 - vin: If you only want to use a single vehicle, otherwise use `create_vehicle`
 - server: Override the Teslemetry server to connect to:
-  - api.teslemetry.com (recommended and default)
+  - api.teslemetry.com (default)
   - na.teslemetry.com
   - eu.teslemetry.com
 
