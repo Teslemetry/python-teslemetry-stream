@@ -38,7 +38,7 @@ async def main():
         stream = TeslemetryStream(
             access_token="<token>",
             vin="<vin>", # for single vehicles
-            server="na.teslemetry.com" # or "eu.teslemetry.com"
+            server="na.teslemetry.com", # or "eu.teslemetry.com"
             session=session,
         )
 
