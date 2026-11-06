@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import aiohttp
 
@@ -68,6 +68,8 @@ LOGGER = logging.getLogger(__package__)
 
 _T = TypeVar("_T")
 
+AlertChange = Literal["started", "ended"]
+
 
 class TeslemetryStreamVehicle:
     """Handle streaming field updates."""
@@ -117,6 +119,18 @@ class TeslemetryStreamVehicle:
         # landing in that window awaits a fresh fetch instead of trusting
         # the pre-disconnect record.
         self.stream.async_add_connection_listener(self._on_connection_event)
+        # Alerts seen, keyed by (name, startedAt), newest first.
+        self._alerts: dict[tuple[str, str], dict[str, Any]] = {}
+        # The transitions found in the alerts event being dispatched, read by
+        # each listen_AlertChanges listener, which dispatch runs after this
+        # internal one.
+        self._alert_event: dict[str, Any] | None = None
+        self._alert_changes: list[tuple[AlertChange, dict[str, Any]]] = []
+        self.stream.async_add_listener(
+            self._on_alerts_event,
+            {Key.VIN: self.vin, Key.ALERTS: None},
+            internal=True,
+        )
 
     @property
     def config(self) -> dict[str, Any]:
@@ -452,6 +466,78 @@ class TeslemetryStreamVehicle:
         return self.stream.async_add_listener(
             lambda x: callback(x[Key.ERRORS]), {Key.VIN: self.vin, Key.ERRORS: None}
         )
+
+    @property
+    def alerts(self) -> list[dict[str, Any]]:
+        """The alerts in the vehicle's latest alerts batch, newest first.
+
+        An alert without ``endedAt`` is active.
+        """
+        return [dict(alert) for alert in self._alerts.values()]
+
+    def _on_alerts_event(self, event: dict[str, Any]) -> None:
+        """Take an alerts batch as `alerts` and record its transitions.
+
+        Each batch is the vehicle's window of recent alerts, newest first and
+        ended ones included, and is resent unchanged (on every reconnect
+        too), so only an alert not seen before or newly ended is a
+        transition. Newness comes from batch position, not ``startedAt``,
+        which the vehicle's clock can skew. The first batch only seeds:
+        without anything seen yet, nothing in it can be told apart from
+        history.
+        """
+        alerts = event.get(Key.ALERTS)
+        if not isinstance(alerts, list):
+            LOGGER.warning("Ignoring malformed alerts event for %s: %r", self.vin, alerts)
+            return
+
+        seeding = self._alert_event is None
+        # Unseen alerts behind one already seen are older history, not starts.
+        first_known = next(
+            (i for i, alert in enumerate(alerts) if _alert_key(alert) in self._alerts),
+            len(alerts),
+        )
+        batch: dict[tuple[str, str], dict[str, Any]] = {}
+        changes: list[tuple[AlertChange, dict[str, Any]]] = []
+        # Oldest first, so transitions are reported in the order they happened.
+        for index in reversed(range(len(alerts))):
+            alert = alerts[index]
+            key = _alert_key(alert)
+            known = self._alerts.get(key)
+            if known is None:
+                known = dict(alert)
+                if not seeding and index < first_known:
+                    changes.append(("started", known))
+                    if "endedAt" in known:
+                        changes.append(("ended", known))
+            elif "endedAt" not in known and "endedAt" in alert:
+                known = dict(alert)
+                changes.append(("ended", known))
+            # A copy of an ended alert without endedAt is stale and never
+            # revives it.
+            batch[key] = known
+
+        self._alerts = dict(reversed(batch.items()))
+        self._alert_event = event
+        self._alert_changes = changes
+
+    def listen_AlertChanges(
+        self, callback: Callable[[AlertChange, dict[str, Any]], None]
+    ) -> Callable[[], None]:
+        """Call back with ("started" | "ended", alert) for each alert transition.
+
+        The first alerts batch after the vehicle is created seeds `alerts`
+        without calling back; a later batch, including the snapshot replayed
+        on reconnect, calls back only for alerts that started or ended since.
+        An alert that both started and ended between batches calls back twice.
+        """
+
+        def handle(event: dict[str, Any]) -> None:
+            if event is self._alert_event:
+                for change, alert in self._alert_changes:
+                    callback(change, dict(alert))
+
+        return self.stream.async_add_listener(handle, {Key.VIN: self.vin, Key.ALERTS: None})
 
     # Add listeners for each signal
     def listen_ACChargingEnergyIn(
@@ -3363,6 +3449,11 @@ def make_datetime(
         callback(data)
 
     return typer
+
+
+def _alert_key(alert: dict[str, Any]) -> tuple[str, str]:
+    """Identify an alert across batches."""
+    return (alert["name"], alert["startedAt"])
 
 
 def merge(source: dict[Any, Any], destination: dict[Any, Any]) -> dict[Any, Any]:

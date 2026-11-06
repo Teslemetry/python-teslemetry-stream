@@ -130,6 +130,15 @@ def make_vehicle_with_capture(
     return vehicle, sent
 
 
+def config_listeners(stream: TeslemetryStream) -> int:
+    """How many registered listeners filter on config events."""
+    return sum(1 for _, filters, _ in stream._listeners.values() if filters and "config" in filters)
+
+
+def public_listeners(stream: TeslemetryStream) -> int:
+    return sum(1 for _, _, is_internal in stream._listeners.values() if not is_internal)
+
+
 def test_sync_construction_without_a_loop() -> bool:
     """Must run before any event loop exists - constructing a stream+vehicle
     synchronously (the library's documented pre-async-context usage) must not
@@ -148,8 +157,8 @@ def test_sync_construction_without_a_loop() -> bool:
     ok = (
         check(
             "the config listener is registered by the time construction returns",
-            len(stream._listeners) == 1,
-            f"listeners {len(stream._listeners)}",
+            config_listeners(stream) == 1,
+            f"config listeners {config_listeners(stream)}",
         )
         and ok
     )
@@ -170,8 +179,8 @@ async def test_registration_happens_at_construction(results: list[bool]) -> None
     results.append(
         check(
             "the internal config listener is registered by construction, before any call",
-            len(stream._listeners) == 1,
-            f"listeners {len(stream._listeners)}",
+            config_listeners(stream) == 1,
+            f"config listeners {config_listeners(stream)}",
         )
     )
     results.append(
@@ -199,9 +208,9 @@ async def test_auto_close_after_last_public_listener_removed(results: list[bool]
 
     results.append(
         check(
-            "two listeners are registered: one internal, one public",
-            len(stream._listeners) == 2,
-            f"listeners {len(stream._listeners)}",
+            "the config listener and one public listener are registered",
+            config_listeners(stream) == 1 and public_listeners(stream) == 1,
+            f"config {config_listeners(stream)}, public {public_listeners(stream)}",
         )
     )
 
@@ -217,8 +226,8 @@ async def test_auto_close_after_last_public_listener_removed(results: list[bool]
     results.append(
         check(
             "the internal listener remains registered after auto-close",
-            len(stream._listeners) == 1,
-            f"listeners {len(stream._listeners)}",
+            config_listeners(stream) == 1 and public_listeners(stream) == 0,
+            f"config {config_listeners(stream)}, public {public_listeners(stream)}",
         )
     )
 
