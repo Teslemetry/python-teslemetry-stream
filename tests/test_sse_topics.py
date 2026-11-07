@@ -97,8 +97,8 @@ def main() -> None:
     asyncio.run(stream.connect())
     results.append(
         check(
-            "omitted topics sends no topics query param",
-            session.calls[0]["params"] is None,
+            "omitted topics sends only cache=true",
+            session.calls[0]["params"] == {"cache": "true"},
             f"got {session.calls[0]['params']}",
         )
     )
@@ -109,7 +109,7 @@ def main() -> None:
     results.append(
         check(
             "topics builds a comma-separated params entry",
-            session.calls[0]["params"] == {"topics": "live_status,site_info"},
+            session.calls[0]["params"] == {"cache": "true", "topics": "live_status,site_info"},
             f"got {session.calls[0]['params']}",
         )
     )
@@ -120,7 +120,7 @@ def main() -> None:
     results.append(
         check(
             "plain string topics are accepted",
-            session.calls[0]["params"] == {"topics": "state,config"},
+            session.calls[0]["params"] == {"cache": "true", "topics": "state,config"},
             f"got {session.calls[0]['params']}",
         )
     )
@@ -144,7 +144,7 @@ def main() -> None:
     results.append(
         check(
             "a bare str topics value is treated as a single topic, not character-split",
-            session.calls[0]["params"] == {"topics": "state"},
+            session.calls[0]["params"] == {"cache": "true", "topics": "state"},
             f"got {session.calls[0]['params']}",
         )
     )
@@ -155,7 +155,7 @@ def main() -> None:
     results.append(
         check(
             "a bare SseTopic topics value is treated as a single topic, not character-split",
-            session.calls[0]["params"] == {"topics": "live_status"},
+            session.calls[0]["params"] == {"cache": "true", "topics": "live_status"},
             f"got {session.calls[0]['params']}",
         )
     )
