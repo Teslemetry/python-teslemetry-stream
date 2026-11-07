@@ -368,13 +368,15 @@ class TeslemetryStream:
                 if not self._response:
                     # Connect to the stream
                     await self.connect()
-                assert self._response
-                async for line_in_bytes in self._response.content:
+                response = self._response
+                assert response
+                async for line_in_bytes in response.content:
                     field, _, value = line_in_bytes.decode("utf8").partition(": ")
                     if field == "data":
                         data = json.loads(value)
-                        # An event without a cursor keeps the last one received.
-                        if data.get("cursor") is not None:
+                        # An event without a cursor keeps the last one received; a line
+                        # from a response already replaced must not set the new one's.
+                        if data.get("cursor") is not None and response is self._response:
                             self._cursor = data["cursor"]
                         if self.parse_timestamp:
                             data["timestamp"] = _parse_created_at(data["createdAt"])

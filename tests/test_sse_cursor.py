@@ -57,6 +57,21 @@ class FakeResponse:
         pass
 
 
+class HeldContent(FakeContent):
+    """Response body whose lines are held until `release()`."""
+
+    def __init__(self, lines: list[bytes]) -> None:
+        super().__init__(lines)
+        self._released = asyncio.Event()
+
+    def release(self) -> None:
+        self._released.set()
+
+    async def __anext__(self) -> bytes:
+        await self._released.wait()
+        return await super().__anext__()
+
+
 class FakeSession:
     def __init__(self, responses: list[FakeResponse | Exception]) -> None:
         self._responses = list(responses)
@@ -185,11 +200,36 @@ async def test_failed_connect_after_topic_change(results: list[bool]) -> None:
     )
 
 
+async def test_line_from_replaced_response(results: list[bool]) -> None:
+    old = FakeResponse([])
+    held = HeldContent([line(event(7))])
+    old.content = held
+    session = FakeSession([old, FakeResponse([])])
+    stream = make_stream(session, topics=["data"])
+    stream.active = True
+
+    task = asyncio.create_task(stream.__anext__())
+    for _ in range(3):
+        await asyncio.sleep(0)  # connected to the old response, waiting on its body
+    stream.topics = ["data", "alerts"]
+    await stream.connect()  # the new response replaces the old one
+    held.release()  # a line the old response had buffered is read afterwards
+    await task
+    results.append(
+        check(
+            "a line from a replaced response does not set the cursor",
+            stream._cursor is None,
+            f"got {stream._cursor!r}",
+        )
+    )
+
+
 async def main() -> int:
     results: list[bool] = []
     await test_resume(results)
     await test_vehicle_change(results)
     await test_failed_connect_after_topic_change(results)
+    await test_line_from_replaced_response(results)
     passed = sum(results)
     print(f"\n{passed}/{len(results)} checks passed")
     return 0 if passed == len(results) else 1
