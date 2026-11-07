@@ -272,10 +272,7 @@ class TeslemetryStream:
             if self.topics:
                 params["topics"] = ",".join(self.topics)
             scope = (url, params.get("topics"))
-            if scope != self._cursor_scope:
-                self._cursor = None
-                self._cursor_scope = scope
-            elif self._cursor is not None:
+            if scope == self._cursor_scope and self._cursor is not None:
                 params["cursor"] = str(self._cursor)
             response = await self._session.get(
                 url,
@@ -295,6 +292,10 @@ class TeslemetryStream:
             if self._response is not None:
                 self._response.close()
             self._response = response
+            # Only now, so a failed GET leaves the cursor tied to the response still supplying it.
+            if scope != self._cursor_scope:
+                self._cursor = None
+                self._cursor_scope = scope
             LOGGER.debug(
                 "Connected to %s with status %s", self._response.url, self._response.status
             )

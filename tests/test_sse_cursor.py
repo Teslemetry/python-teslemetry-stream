@@ -6,8 +6,11 @@ whose vehicles or topics changed, omits it and takes a full snapshot.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from typing import Any
+
+import aiohttp
 
 from teslemetry_stream.stream import TeslemetryStream
 
@@ -55,13 +58,16 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, responses: list[FakeResponse]) -> None:
+    def __init__(self, responses: list[FakeResponse | Exception]) -> None:
         self._responses = list(responses)
         self.calls: list[dict[str, Any]] = []
 
     async def get(self, url: str, **kwargs: Any) -> FakeResponse:
         self.calls.append({"url": url, **kwargs})
-        return self._responses.pop(0)
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 def make_stream(session: FakeSession, **kwargs: Any) -> TeslemetryStream:
@@ -153,10 +159,37 @@ async def test_vehicle_change(results: list[bool]) -> None:
     )
 
 
+async def test_failed_connect_after_topic_change(results: list[bool]) -> None:
+    session = FakeSession(
+        [
+            FakeResponse([event(5), event(7)]),
+            aiohttp.ClientError("refused"),
+            FakeResponse([event()]),
+        ]
+    )
+    stream = make_stream(session, topics=["data"])
+    stream.active = True
+
+    await stream.__anext__()
+    stream.topics = ["data", "alerts"]
+    with contextlib.suppress(aiohttp.ClientError):
+        await stream.connect()  # GET with the new topics fails
+    await stream.__anext__()  # the old response is still supplying cursors
+    await stream.__anext__()  # old body ends, reconnects with the new topics
+    results.append(
+        check(
+            "old response's cursor is not sent for the new topics",
+            sent_cursor(session, 2) is None,
+            f"got {sent_cursor(session, 2)!r}",
+        )
+    )
+
+
 async def main() -> int:
     results: list[bool] = []
     await test_resume(results)
     await test_vehicle_change(results)
+    await test_failed_connect_after_topic_change(results)
     passed = sum(results)
     print(f"\n{passed}/{len(results)} checks passed")
     return 0 if passed == len(results) else 1
