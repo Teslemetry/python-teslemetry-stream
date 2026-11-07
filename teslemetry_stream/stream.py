@@ -263,7 +263,10 @@ class TeslemetryStream:
             if self.vin:
                 url += f"/{self.vin}"
             headers = await self.headers()
-            params = {"topics": ",".join(self.topics)} if self.topics else None
+            # Explicit so the connect-time snapshot survives the server default changing.
+            params = {"cache": "true"}
+            if self.topics:
+                params["topics"] = ",".join(self.topics)
             response = await self._session.get(
                 url,
                 headers=headers,
