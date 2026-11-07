@@ -87,6 +87,10 @@ class TeslemetryStream:
         self.parse_timestamp = parse_timestamp
         self.manual = manual
         self.retries: int = 0
+        # Last cache position received, and the (url, topics) it belongs to -
+        # only a reconnect asking for the same vehicles and topics may resume from it.
+        self._cursor: Any = None
+        self._cursor_scope: tuple[str, str | None] | None = None
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
         self.energysites: dict[int, TeslemetryStreamEnergySite] = {}
         self.fields: dict[str, Any] = {}
@@ -267,6 +271,12 @@ class TeslemetryStream:
             params = {"cache": "true"}
             if self.topics:
                 params["topics"] = ",".join(self.topics)
+            scope = (url, params.get("topics"))
+            if scope != self._cursor_scope:
+                self._cursor = None
+                self._cursor_scope = scope
+            elif self._cursor is not None:
+                params["cursor"] = str(self._cursor)
             response = await self._session.get(
                 url,
                 headers=headers,
@@ -362,6 +372,9 @@ class TeslemetryStream:
                     field, _, value = line_in_bytes.decode("utf8").partition(": ")
                     if field == "data":
                         data = json.loads(value)
+                        # An event without a cursor keeps the last one received.
+                        if data.get("cursor") is not None:
+                            self._cursor = data["cursor"]
                         if self.parse_timestamp:
                             data["timestamp"] = _parse_created_at(data["createdAt"])
                         return cast(dict[str, Any], data)
