@@ -115,6 +115,10 @@ async def main():
         await stream.close()
 ```
 
+## Reconnects
+
+After a reconnect the stream resumes the connect-time snapshot from the last event `cursor` it received, so you are not resent what you already have. `server`, `vin` and `topics` are fixed for a stream object's lifetime; to use different ones, create a new `TeslemetryStream`, which starts with a full snapshot.
+
 ## Energy Site Streaming
 
 Energy sites stream two events, `live_status` and `site_info`. Unlike vehicle

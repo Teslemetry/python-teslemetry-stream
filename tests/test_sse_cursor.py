@@ -1,16 +1,12 @@
 """Checks the SSE `cursor` resume: the stream keeps the last `cursor` an event
-carried and sends it back on a reconnect asking for the same vehicles and
-topics, so the connect snapshot starts after it. A first connect, or one
-whose vehicles or topics changed, omits it and takes a full snapshot.
+carried and sends it back on every reconnect, so the connect snapshot starts
+after it. A first connect omits it and takes a full snapshot.
 """
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 from typing import Any
-
-import aiohttp
 
 from teslemetry_stream.stream import TeslemetryStream
 
@@ -126,70 +122,10 @@ async def test_resume(results: list[bool]) -> None:
         )
     )
 
-    stream.topics = ["data", "alerts"]
-    await stream.__anext__()  # body ends, reconnects with new topics
-    results.append(
-        check(
-            "reconnect after a topic change omits cursor",
-            sent_cursor(session, 2) is None,
-            f"got {sent_cursor(session, 2)!r}",
-        )
-    )
-    results.append(
-        check("topic change discards the old cursor", stream._cursor is None)
-    )
-
-
-async def test_vehicle_change(results: list[bool]) -> None:
-    session = FakeSession(
-        [FakeResponse([event(5)]), FakeResponse([event()])]
-    )
-    stream = make_stream(session, vin=VIN)
-    stream.active = True
-
-    await stream.__anext__()
-    stream.vin = "LRW3F7EK4NC000002"
-    await stream.__anext__()  # body ends, reconnects for another vehicle
-    results.append(
-        check(
-            "reconnect after a vehicle change omits cursor",
-            sent_cursor(session, 1) is None,
-            f"got {sent_cursor(session, 1)!r}",
-        )
-    )
-
-
-async def test_failed_connect_after_topic_change(results: list[bool]) -> None:
-    session = FakeSession(
-        [
-            FakeResponse([event(5), event(7)]),
-            aiohttp.ClientError("refused"),
-            FakeResponse([event()]),
-        ]
-    )
-    stream = make_stream(session, topics=["data"])
-    stream.active = True
-
-    await stream.__anext__()
-    stream.topics = ["data", "alerts"]
-    with contextlib.suppress(aiohttp.ClientError):
-        await stream.connect()  # GET with the new topics fails
-    await stream.__anext__()  # the old response is still supplying cursors
-    await stream.__anext__()  # old body ends, reconnects with the new topics
-    results.append(
-        check(
-            "old response's cursor is not sent for the new topics",
-            sent_cursor(session, 2) is None,
-            f"got {sent_cursor(session, 2)!r}",
-        )
-    )
-
 
 async def main() -> int:
     results: list[bool] = []
     await test_resume(results)
-    await test_vehicle_change(results)
-    await test_failed_connect_after_topic_change(results)
     passed = sum(results)
     print(f"\n{passed}/{len(results)} checks passed")
     return 0 if passed == len(results) else 1

@@ -87,10 +87,10 @@ class TeslemetryStream:
         self.parse_timestamp = parse_timestamp
         self.manual = manual
         self.retries: int = 0
-        # Last cache position received, and the (url, topics) it belongs to -
-        # only a reconnect asking for the same vehicles and topics may resume from it.
+        # Last cache position received, sent back on every reconnect. server, vin
+        # and topics are fixed for the object's lifetime; a caller wanting
+        # different ones creates a new stream rather than reusing this cursor.
         self._cursor: Any = None
-        self._cursor_scope: tuple[str, str | None] | None = None
         self.vehicles: dict[str, TeslemetryStreamVehicle] = {}
         self.energysites: dict[int, TeslemetryStreamEnergySite] = {}
         self.fields: dict[str, Any] = {}
@@ -271,8 +271,7 @@ class TeslemetryStream:
             params = {"cache": "true"}
             if self.topics:
                 params["topics"] = ",".join(self.topics)
-            scope = (url, params.get("topics"))
-            if scope == self._cursor_scope and self._cursor is not None:
+            if self._cursor is not None:
                 params["cursor"] = str(self._cursor)
             response = await self._session.get(
                 url,
@@ -292,10 +291,6 @@ class TeslemetryStream:
             if self._response is not None:
                 self._response.close()
             self._response = response
-            # Only now, so a failed GET leaves the cursor tied to the response still supplying it.
-            if scope != self._cursor_scope:
-                self._cursor = None
-                self._cursor_scope = scope
             LOGGER.debug(
                 "Connected to %s with status %s", self._response.url, self._response.status
             )
