@@ -1,14 +1,12 @@
 """Checks the SSE `cursor` resume: the stream keeps the last `cursor` an event
-carried and sends it back on a reconnect asking for the same vehicles and
-topics, so the connect snapshot starts after it. A first connect, or one
-whose vehicles or topics changed, omits it and takes a full snapshot.
+carried and sends it back on every reconnect, so the connect snapshot starts
+after it. A first connect omits it and takes a full snapshot.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 from typing import Any
-
 
 from teslemetry_stream.stream import TeslemetryStream
 
